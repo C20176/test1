@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SignBiz — Business Sign Language Dictionary</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
+<!--
+╔══════════════════════════════════════════════════════════════════╗
+║  SIGNBIZ SETUP                                                   ║
+╠══════════════════════════════════════════════════════════════════╣
+║  1. Paste your Firebase config in the firebaseConfig block       ║
+║  2. Firestore Security Rules:                                    ║
+║     rules_version = '2';                                         ║
+║     service cloud.firestore {                                    ║
+║       match /databases/{database}/documents {                    ║
+║         match /{document=**} {                                   ║
+║           allow read: if true;                                   ║
+║           allow write: if request.auth != null;                  ║
+║         }                                                        ║
+║       }                                                          ║
+║     }                                                            ║
+║  NOTE: feedback collection allows public write (anyone can       ║
+║  submit). Add this rule for feedback:                            ║
+║     match /feedback/{id} { allow write: if true; }               ║
+╚══════════════════════════════════════════════════════════════════╝
+-->
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#fff;--bg2:#f5f5f3;--bg3:#eeece8;
+  --text:#1a1a18;--text2:#6b6b66;--text3:#9a9a94;
+  --border:rgba(0,0,0,0.12);--border2:rgba(0,0,0,0.22);
+  --accent:#1a4a8a;--accent2:#2563b0;--accent-light:#e8f0fb;
+  --danger:#993C1D;--danger-light:#FAECE7;
+  --success:#0F6E56;--success-light:#E1F5EE;
+  --r-sm:6px;--r-md:10px;--r-lg:14px;
+  --vhow:#1a4a8a;--vhow-light:#e8f0fb;
+  --vconcept:#0F6E56;--vconcept-light:#E1F5EE;
+  --vexample:#854F0B;--vexample-light:#FAEEDA;
+}
+body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;}
+.page{display:none;}.page.active{display:block;}
+
+/* LOADING */
+.app-loading{position:fixed;inset:0;background:var(--accent);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999;}
+.app-loading i{font-size:40px;color:white;}
+.app-loading p{font-size:14px;color:rgba(255,255,255,0.8);}
+.spinner{width:28px;height:28px;border:3px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* LOGIN */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg3);}
+.login-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:32px;width:min(400px,92vw);}
+.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:24px;}
+.login-logo i{font-size:28px;color:var(--accent);}
+.login-logo-text{font-size:18px;font-weight:500;}
+.login-logo-sub{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;}
+.login-divider{display:flex;align-items:center;gap:10px;margin:16px 0;font-size:11px;color:var(--text3);}
+.login-divider::before,.login-divider::after{content:'';flex:1;height:0.5px;background:var(--border);}
+.google-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;border:0.5px solid var(--border2);border-radius:var(--r-md);background:var(--bg);font-size:13px;font-weight:500;cursor:pointer;transition:background 0.15s;}
+.google-btn:hover{background:var(--bg2);}
+.google-btn svg{width:18px;height:18px;}
+.login-error{font-size:12px;color:var(--danger);margin-top:8px;display:none;}
+
+/* HEADER */
+.header{background:var(--accent);padding:0 24px;display:flex;align-items:center;position:sticky;top:0;z-index:100;}
+.header-logo{display:flex;align-items:center;gap:10px;padding:14px 0;margin-right:32px;}
+.header-logo i{font-size:22px;color:rgba(255,255,255,0.9);}
+.header-logo-text{font-size:15px;font-weight:500;color:white;line-height:1.2;}
+.header-logo-sub{font-size:10px;color:rgba(255,255,255,0.6);letter-spacing:0.05em;text-transform:uppercase;}
+.header-nav{display:flex;align-items:stretch;flex:1;}
+.nav-item{padding:0 16px;display:flex;align-items:center;font-size:13px;color:rgba(255,255,255,0.75);cursor:pointer;border-bottom:3px solid transparent;transition:all 0.15s;white-space:nowrap;}
+.nav-item:hover{color:white;background:rgba(255,255,255,0.08);}
+.nav-item.active{color:white;border-bottom-color:white;}
+.header-search{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.15);border-radius:var(--r-md);padding:0 12px;margin:10px 0 10px 16px;}
+.header-search i{color:rgba(255,255,255,0.7);font-size:15px;}
+.header-search input{border:none;outline:none;background:transparent;font-size:13px;color:white;padding:7px 0;width:180px;}
+.header-search input::placeholder{color:rgba(255,255,255,0.5);}
+.lang-toggle{display:flex;align-items:center;gap:3px;background:rgba(255,255,255,0.12);border-radius:var(--r-md);padding:3px;margin-left:12px;}
+.lang-btn{font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:transparent;color:rgba(255,255,255,0.65);transition:all 0.15s;}
+.lang-btn.active{background:white;color:var(--accent);}
+.header-right{display:flex;align-items:center;gap:8px;margin-left:16px;}
+.header-user{display:flex;align-items:center;gap:7px;font-size:12px;color:rgba(255,255,255,0.8);}
+.header-user img{width:26px;height:26px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.5);}
+.hdr-btn{display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:var(--r-md);font-size:12px;font-weight:500;cursor:pointer;border:0.5px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.12);color:white;transition:background 0.15s;white-space:nowrap;}
+.hdr-btn:hover{background:rgba(255,255,255,0.22);}
+
+/* HANDSHAPE STRIP */
+.hs-strip{background:var(--accent);padding:0 0 16px;}
+.hs-grid{display:flex;flex-wrap:wrap;gap:3px;padding:0 24px;}
+.hs-cell{width:52px;height:52px;border:2px solid rgba(255,255,255,0.2);border-radius:4px;overflow:hidden;cursor:pointer;background:#0d2d5a;display:flex;align-items:center;justify-content:center;transition:all 0.15s;position:relative;flex-shrink:0;}
+.hs-cell:hover{border-color:rgba(255,255,255,0.7);}
+.hs-cell.active{border-color:white;box-shadow:0 0 0 2px white;}
+.hs-cell.no-data{opacity:0.35;cursor:default;}
+.hs-cell img{width:100%;height:100%;object-fit:cover;}
+.hs-cell .hs-letter{font-size:16px;font-weight:600;color:rgba(255,255,255,0.5);}
+.hs-cell.active .hs-letter{color:white;}
+.hs-cell .hs-badge{position:absolute;bottom:2px;right:3px;font-size:9px;font-weight:600;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.8);}
+.hs-all{padding:10px 24px 0;display:flex;gap:8px;align-items:center;}
+.hs-all-btn{font-size:12px;padding:4px 14px;border-radius:20px;border:0.5px solid rgba(255,255,255,0.4);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;transition:all 0.15s;}
+.hs-all-btn:hover,.hs-all-btn.active{background:white;color:var(--accent);}
+.hs-label{font-size:11px;color:rgba(255,255,255,0.5);margin-left:8px;}
+
+/* LAYOUT */
+.main-layout{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - 141px);}
+.left{background:var(--bg);border-right:0.5px solid var(--border);display:flex;flex-direction:column;}
+.left-top{padding:12px 14px;border-bottom:0.5px solid var(--border);}
+.adv-btn{display:flex;align-items:center;gap:5px;padding:6px 11px;border:0.5px solid var(--border2);border-radius:var(--r-md);font-size:12px;color:var(--text2);cursor:pointer;background:var(--bg2);margin-top:8px;transition:all 0.15s;width:100%;justify-content:center;}
+.adv-btn:hover,.adv-btn.open{background:var(--accent-light);color:var(--accent);border-color:var(--accent);}
+.adv-panel{display:none;padding:12px 14px;border-bottom:0.5px solid var(--border);background:var(--bg2);}
+.adv-panel.show{display:block;}
+.adv-field{margin-bottom:8px;}
+.adv-field label{font-size:10px;color:var(--text3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em;}
+.adv-field select{width:100%;font-size:12px;padding:6px 8px;border-radius:var(--r-sm);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);outline:none;cursor:pointer;}
+.adv-section-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin:10px 0 5px;}
+.adv-tags{display:flex;gap:4px;flex-wrap:wrap;}
+.adv-tag{font-size:11px;padding:3px 8px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer;transition:all 0.12s;user-select:none;}
+.adv-tag.on{background:var(--accent);color:white;border-color:var(--accent);}
+.adv-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border);}
+.adv-actions button{font-size:12px;padding:5px 12px;border-radius:var(--r-sm);border:0.5px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;}
+.adv-actions .apply{background:var(--accent);color:white;border-color:var(--accent);}
+.result-count{font-size:11px;color:var(--text3);padding:8px 14px 4px;}
+.word-list{flex:1;overflow-y:auto;}
+.word-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:0.5px solid var(--border);cursor:pointer;transition:background 0.1s;}
+.word-row:hover{background:var(--bg2);}
+.word-row.active{background:var(--accent-light);}
+.word-en{font-size:13px;font-weight:500;color:var(--text);flex:1;}
+.word-sub{font-size:11px;color:var(--text3);}
+.pill{font-size:10px;padding:2px 7px;border-radius:20px;white-space:nowrap;flex-shrink:0;}
+.no-results{padding:24px;text-align:center;color:var(--text3);font-size:13px;}
+
+/* MULTISELECT CHIPS */
+.ms-wrap{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+.ms-chip{font-size:11px;padding:4px 10px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;user-select:none;transition:all 0.12s;}
+.ms-chip.on{background:var(--accent);color:white;border-color:var(--accent);}
+.ms-chip-sm{font-size:11px;padding:3px 8px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;user-select:none;transition:all 0.12s;}
+.ms-chip-sm.on{background:var(--accent-light);color:var(--accent);border-color:var(--accent);}
+
+/* DETAIL */
+.right{padding:24px;overflow-y:auto;background:var(--bg3);}
+.detail-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:22px 24px;max-width:660px;}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:360px;color:var(--text3);gap:10px;}
+.empty-state i{font-size:36px;}
+.empty-state p{font-size:13px;text-align:center;line-height:1.7;}
+.entry-en{font-size:22px;font-weight:500;color:var(--text);margin-bottom:2px;}
+.entry-es{font-size:15px;color:var(--text2);margin-bottom:12px;font-style:italic;}
+.entry-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;}
+.vid-tabs{display:flex;gap:6px;margin-bottom:10px;}
+.vid-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 8px;border-radius:var(--r-md);font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);transition:all 0.15s;}
+.vid-tab.active[data-type="how"]{background:var(--vhow-light);border-color:var(--vhow);color:var(--vhow);}
+.vid-tab.active[data-type="concept"]{background:var(--vconcept-light);border-color:var(--vconcept);color:var(--vconcept);}
+.vid-tab.active[data-type="example"]{background:var(--vexample-light);border-color:var(--vexample);color:var(--vexample);}
+.video-box{background:#000;border-radius:var(--r-md);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;margin-bottom:14px;overflow:hidden;border:0.5px solid var(--border);position:relative;}
+.video-box iframe{width:100%;height:100%;border:none;}
+.vid-ph{display:flex;flex-direction:column;align-items:center;gap:8px;background:var(--bg2);width:100%;height:100%;justify-content:center;}
+.vid-ph i{font-size:28px;color:var(--text3);}
+.vid-ph p{font-size:12px;color:var(--text3);}
+.entry-desc{font-size:13px;color:var(--text2);line-height:1.65;padding-top:14px;border-top:0.5px solid var(--border);}
+.entry-desc strong{color:var(--text);font-weight:500;}
+
+/* FEEDBACK WIDGET */
+.feedback-wrap{margin-top:16px;padding-top:14px;border-top:0.5px solid var(--border);}
+.feedback-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.star-row{display:flex;gap:4px;margin-bottom:10px;}
+.star{font-size:22px;cursor:pointer;color:var(--border2);transition:color 0.1s;user-select:none;}
+.star.on,.star:hover{color:#F59E0B;}
+.fb-type-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+.fb-type{font-size:11px;padding:4px 10px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;transition:all 0.12s;}
+.fb-type.on{background:var(--accent);color:white;border-color:var(--accent);}
+.fb-textarea{width:100%;font-size:12px;padding:8px 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);outline:none;resize:vertical;min-height:60px;margin-bottom:8px;}
+.fb-textarea:focus{border-color:var(--accent);background:var(--bg);}
+.fb-submit{font-size:12px;padding:6px 16px;border-radius:var(--r-md);border:0.5px solid var(--accent);background:var(--accent);color:white;cursor:pointer;transition:background 0.15s;}
+.fb-submit:hover{background:var(--accent2);}
+.fb-success{font-size:12px;color:var(--success);display:none;align-items:center;gap:5px;}
+
+/* ADMIN */
+.admin-header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;}
+.admin-title{font-size:18px;font-weight:500;}
+.admin-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+.admin-tabs{display:flex;border-bottom:0.5px solid var(--border);background:var(--bg);padding:0 24px;}
+.admin-tab{padding:10px 18px;font-size:13px;color:var(--text2);cursor:pointer;border-bottom:2.5px solid transparent;transition:all 0.15s;white-space:nowrap;}
+.admin-tab:hover{color:var(--text);}
+.admin-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500;}
+.admin-tab-panel{display:none;}
+.admin-tab-panel.active{display:block;}
+.admin-table-wrap{padding:20px 24px;}
+.admin-table{width:100%;border-collapse:collapse;background:var(--bg);border-radius:var(--r-lg);overflow:hidden;border:0.5px solid var(--border);}
+.admin-table th{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;padding:10px 14px;border-bottom:0.5px solid var(--border);text-align:left;background:var(--bg2);font-weight:500;}
+.admin-table td{font-size:13px;padding:10px 14px;border-bottom:0.5px solid var(--border);color:var(--text);vertical-align:middle;}
+.admin-table tr:last-child td{border-bottom:none;}
+.admin-table tr:hover td{background:var(--bg2);}
+.row-actions{display:flex;gap:6px;}
+.row-btn{display:flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:var(--r-sm);border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;transition:all 0.12s;}
+.row-btn:hover{background:var(--bg2);color:var(--text);}
+.row-btn.del:hover{background:var(--danger-light);color:var(--danger);border-color:var(--danger);}
+.vdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block;}
+.vdot.on{background:var(--success);}
+.vdot.off{background:var(--border2);}
+.saving{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px;}
+.saving .spinner{width:12px;height:12px;border-width:2px;}
+
+/* OPTIONS */
+.options-wrap{padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.options-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:18px 20px;}
+.options-card-title{font-size:14px;font-weight:500;margin-bottom:4px;}
+.options-card-sub{font-size:11px;color:var(--text3);margin-bottom:14px;}
+.options-list{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;max-height:200px;overflow-y:auto;}
+.option-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border:0.5px solid var(--border);border-radius:var(--r-md);background:var(--bg2);}
+.option-row input{flex:1;border:none;background:transparent;font-size:13px;color:var(--text);outline:none;}
+.option-row-del{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:var(--r-sm);border:none;background:transparent;color:var(--text3);cursor:pointer;}
+.option-row-del:hover{background:var(--danger-light);color:var(--danger);}
+.options-add-row{display:flex;gap:6px;}
+.options-add-row input{flex:1;font-size:13px;padding:7px 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);outline:none;}
+.options-add-row input:focus{border-color:var(--accent);background:var(--bg);}
+.options-add-row button{font-size:12px;padding:7px 14px;border-radius:var(--r-md);border:none;background:var(--accent);color:white;cursor:pointer;}
+.options-note{font-size:11px;color:var(--text3);margin-top:8px;}
+
+/* CUSTOM FIELDS */
+.cf-wrap{padding:20px 24px;}
+.cf-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:18px 20px;margin-bottom:16px;}
+.cf-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.cf-card-title{font-size:14px;font-weight:500;}
+.cf-new-row{display:flex;gap:8px;align-items:flex-end;background:var(--bg2);border-radius:var(--r-md);padding:14px;margin-bottom:16px;}
+.cf-new-row .form-field{margin-bottom:0;flex:1;}
+
+/* HANDSHAPE MANAGE */
+.hs-manage-wrap{padding:20px 24px;}
+.hs-manage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:10px;}
+.hs-manage-cell{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-md);padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.hs-manage-preview{width:60px;height:60px;border-radius:var(--r-sm);border:0.5px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg2);}
+.hs-manage-preview img{width:100%;height:100%;object-fit:cover;}
+.hs-manage-letter{font-size:22px;font-weight:600;color:var(--text3);}
+.hs-manage-lbl{font-size:11px;font-weight:600;color:var(--text2);}
+.hs-manage-upload{font-size:10px;padding:3px 8px;border-radius:20px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;transition:all 0.12s;}
+.hs-manage-upload:hover{background:var(--accent-light);color:var(--accent);border-color:var(--accent);}
+.hs-manage-del{font-size:10px;padding:3px 8px;border-radius:20px;border:none;background:transparent;color:var(--text3);cursor:pointer;}
+.hs-manage-del:hover{background:var(--danger-light);color:var(--danger);}
+
+/* FEEDBACK ADMIN */
+.fb-admin-wrap{padding:20px 24px;}
+.fb-admin-filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+.fb-admin-filters select{font-size:12px;padding:6px 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);outline:none;cursor:pointer;}
+.fb-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:14px 16px;margin-bottom:10px;}
+.fb-card-header{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
+.fb-stars{color:#F59E0B;font-size:12px;letter-spacing:1px;}
+.fb-badge{font-size:10px;padding:2px 8px;border-radius:20px;background:var(--accent-light);color:var(--accent);}
+.fb-sign-ref{font-size:11px;color:var(--text3);}
+.fb-card-text{font-size:13px;color:var(--text2);line-height:1.6;}
+.fb-card-meta{font-size:11px;color:var(--text3);margin-top:6px;}
+.fb-del-btn{margin-left:auto;font-size:11px;padding:3px 8px;border-radius:var(--r-sm);border:0.5px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;}
+.fb-del-btn:hover{background:var(--danger-light);color:var(--danger);border-color:var(--danger);}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+.modal-overlay.show{display:flex;}
+.modal-box{background:var(--bg);border-radius:var(--r-lg);padding:22px;width:min(560px,92vw);max-height:90vh;overflow-y:auto;}
+.modal-title{font-size:16px;font-weight:500;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
+.modal-close-x{cursor:pointer;font-size:18px;color:var(--text3);}
+.modal-close-x:hover{color:var(--text);}
+.modal-video{width:82vw;max-width:780px;border-radius:var(--r-lg);background:#000;aspect-ratio:16/9;border:none;}
+.modal-close-btn{color:white;font-size:13px;cursor:pointer;border:0.5px solid rgba(255,255,255,0.35);border-radius:var(--r-md);padding:7px 18px;background:transparent;display:flex;align-items:center;gap:6px;}
+.modal-close-btn:hover{background:rgba(255,255,255,0.12);}
+
+/* FORM */
+.form-field{margin-bottom:14px;}
+.form-field label{font-size:12px;color:var(--text2);display:block;margin-bottom:5px;font-weight:500;}
+.form-field input,.form-field select,.form-field textarea{width:100%;font-size:13px;padding:8px 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);outline:none;transition:border-color 0.15s;}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--accent);background:var(--bg);}
+.form-field textarea{resize:vertical;min-height:72px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:14px;border-top:0.5px solid var(--border);}
+.btn{font-size:13px;padding:8px 16px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;transition:all 0.15s;}
+.btn:hover{background:var(--bg2);}
+.btn-primary{background:var(--accent);color:white;border-color:var(--accent);}
+.btn-primary:hover{background:var(--accent2);}
+.btn-danger{background:var(--danger-light);color:var(--danger);border-color:var(--danger);}
+.btn-danger:hover{background:var(--danger);color:white;}
+.inline-add-btn{flex-shrink:0;padding:0 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg2);color:var(--accent);cursor:pointer;font-size:18px;line-height:1;height:36px;}
+.inline-add-btn:hover{background:var(--accent-light);}
+.yt-hint{font-size:11px;color:var(--text3);margin-top:4px;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:white;font-size:13px;padding:10px 20px;border-radius:var(--r-lg);z-index:999;opacity:0;transition:opacity 0.2s;pointer-events:none;}
+.toast.show{opacity:1;}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px;}
+</style>
+</head>
+<body>
+
+<div class="app-loading" id="appLoading">
+  <i class="ti ti-hand-finger"></i>
+  <div class="spinner"></div>
+  <p>Loading SignBiz...</p>
+</div>
+
+<!-- LOGIN -->
+<div class="page" id="pageLogin">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo"><i class="ti ti-hand-finger"></i><div><div class="login-logo-text">SignBiz Admin</div><div class="login-logo-sub">Business Sign Language</div></div></div>
+      <p style="font-size:14px;font-weight:500;margin-bottom:4px;">Sign in to manage the dictionary</p>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:18px;">Students don't need to sign in.</p>
+      <div class="form-field"><label>Email</label><input type="email" id="loginEmail" onkeydown="if(event.key==='Enter')loginEmail_pw()"/></div>
+      <div class="form-field"><label>Password</label><input type="password" id="loginPassword" onkeydown="if(event.key==='Enter')loginEmail_pw()"/></div>
+      <div class="login-error" id="loginError"></div>
+      <button class="btn btn-primary" style="width:100%;margin-top:4px;" onclick="loginEmail_pw()">Sign in with Email</button>
+      <div class="login-divider">or</div>
+      <button class="google-btn" onclick="loginGoogle()">
+        <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Sign in with Google
+      </button>
+      <p style="margin-top:16px;font-size:11px;color:var(--text3);text-align:center;"><a href="#" onclick="cancelLogin()" style="color:var(--accent);">Back to dictionary</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header class="header" id="mainHeader" style="display:none;">
+  <div class="header-logo"><i class="ti ti-hand-finger"></i><div><div class="header-logo-text">SignBiz</div><div class="header-logo-sub">Business Sign Language</div></div></div>
+  <nav class="header-nav">
+    <div class="nav-item active" id="navDict" onclick="showPage('dict')">Dictionary</div>
+    <div class="nav-item" id="navAbout" onclick="showPage('about')">About</div>
+  </nav>
+  <div class="header-search"><i class="ti ti-search"></i><input type="text" id="globalSearch" placeholder="Search signs..." oninput="doFilter()"/></div>
+  <div class="lang-toggle">
+    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" onclick="setLang('es')">ES</button>
+  </div>
+  <div class="header-right">
+    <div class="header-user" id="headerUser" style="display:none;"></div>
+    <button class="hdr-btn" id="adminNavBtn" style="display:none;" onclick="showPage('admin')"><i class="ti ti-settings"></i> Manage</button>
+    <button class="hdr-btn" id="loginNavBtn" onclick="showPage('login')"><i class="ti ti-login"></i> Admin Login</button>
+    <button class="hdr-btn" id="logoutBtn" style="display:none;" onclick="doLogout()"><i class="ti ti-logout"></i> Sign out</button>
+  </div>
+</header>
+
+<!-- DICTIONARY -->
+<div class="page" id="pageDict">
+  <div class="hs-strip">
+    <div class="hs-all"><button class="hs-all-btn active" id="hsAllBtn" onclick="setAZ(null)">All signs</button><span class="hs-label">or browse by handshape:</span></div>
+    <div class="hs-grid" id="hsGrid"></div>
+  </div>
+  <div class="main-layout">
+    <aside class="left">
+      <div class="left-top">
+        <button class="adv-btn" id="advToggle" onclick="toggleAdv()"><i class="ti ti-adjustments-horizontal"></i> Advanced filters</button>
+      </div>
+      <div class="adv-panel" id="advPanel">
+        <div id="filterFieldsWrap"></div>
+        <p class="adv-section-lbl">Special tags</p>
+        <div class="adv-tags" id="filterTags"></div>
+        <div class="adv-actions">
+          <button onclick="resetFilters()">Reset</button>
+          <button class="apply" onclick="toggleAdv()">Done</button>
+        </div>
+      </div>
+      <p class="result-count" id="resultCount"></p>
+      <div class="word-list" id="wordList"></div>
+    </aside>
+    <main class="right" id="rightPanel">
+      <div class="empty-state"><i class="ti ti-hand-finger"></i><p>Select a sign from the list<br>to view its videos and description.</p></div>
+    </main>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div class="page" id="pageAdmin">
+  <div class="admin-header">
+    <div><div class="admin-title">Manage Dictionary</div><div class="admin-sub" id="adminSub"></div></div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span class="saving" id="savingIndicator" style="display:none;"><div class="spinner"></div> Saving...</span>
+      <button class="btn btn-primary" id="addSignBtn" onclick="openAddModal()"><i class="ti ti-plus"></i> Add new sign</button>
+      <button class="btn" onclick="showPage('dict')"><i class="ti ti-arrow-left"></i> Back</button>
+    </div>
+  </div>
+  <div class="admin-tabs">
+    <div class="admin-tab active" id="atSigns" onclick="switchAdminTab('signs')">Signs</div>
+    <div class="admin-tab" id="atOptions" onclick="switchAdminTab('options')">Categories &amp; Tags</div>
+    <div class="admin-tab" id="atFields" onclick="switchAdminTab('fields')">Custom Fields</div>
+    <div class="admin-tab" id="atHandshapes" onclick="switchAdminTab('handshapes')">Handshape Images</div>
+    <div class="admin-tab" id="atFeedback" onclick="switchAdminTab('feedback')">Feedback</div>
+  </div>
+
+  <!-- Signs tab -->
+  <div class="admin-tab-panel active" id="apSigns">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Sign</th><th>Spanish</th><th>Category</th><th>Hand</th><th>Difficulty</th><th>Videos</th><th>Actions</th></tr></thead>
+        <tbody id="adminTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Options tab -->
+  <div class="admin-tab-panel" id="apOptions">
+    <div class="options-wrap">
+      <div class="options-card">
+        <div class="options-card-title">Categories</div>
+        <div class="options-card-sub">Multi-select on each sign.</div>
+        <div class="options-list" id="catList"></div>
+        <div class="options-add-row"><input type="text" id="newCatInput" placeholder="New category..." onkeydown="if(event.key==='Enter')addOption('cat')"/><button onclick="addOption('cat')">Add</button></div>
+      </div>
+      <div class="options-card">
+        <div class="options-card-title">Topics / Subjects</div>
+        <div class="options-card-sub">Multi-select on each sign.</div>
+        <div class="options-list" id="topicList"></div>
+        <div class="options-add-row"><input type="text" id="newTopicInput" placeholder="New topic..." onkeydown="if(event.key==='Enter')addOption('topic')"/><button onclick="addOption('topic')">Add</button></div>
+      </div>
+      <div class="options-card">
+        <div class="options-card-title">Difficulty Levels</div>
+        <div class="options-card-sub">Single-select on each sign.</div>
+        <div class="options-list" id="diffList"></div>
+        <div class="options-add-row"><input type="text" id="newDiffInput" placeholder="New level..." onkeydown="if(event.key==='Enter')addOption('diff')"/><button onclick="addOption('diff')">Add</button></div>
+      </div>
+      <div class="options-card" style="grid-column:1/-1;">
+        <div class="options-card-title">Special Tags</div>
+        <div class="options-card-sub">Multi-select tags for filtering.</div>
+        <div class="options-list" id="tagList" style="flex-direction:row;flex-wrap:wrap;max-height:none;"></div>
+        <div class="options-add-row" style="margin-top:10px;"><input type="text" id="newTagInput" placeholder="New tag..." onkeydown="if(event.key==='Enter')addOption('tag')"/><button onclick="addOption('tag')">Add</button></div>
+        <p class="options-note">⚠ Deleting a tag removes it from all signs.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Fields tab -->
+  <div class="admin-tab-panel" id="apFields">
+    <div class="cf-wrap">
+      <div class="cf-new-row">
+        <div class="form-field"><label>Field name</label><input type="text" id="cfNewName" placeholder="e.g. Region, Register..."/></div>
+        <div class="form-field"><label>Type</label>
+          <select id="cfNewType">
+            <option value="multiselect">Multi-select</option>
+            <option value="singleselect">Single-select</option>
+            <option value="text">Free text</option>
+          </select>
+        </div>
+        <div style="padding-bottom:0;"><button class="btn btn-primary" onclick="addCustomField()" style="margin-top:20px;"><i class="ti ti-plus"></i> Add field</button></div>
+      </div>
+      <div id="cfList"></div>
+    </div>
+  </div>
+
+  <!-- Handshapes tab -->
+  <div class="admin-tab-panel" id="apHandshapes">
+    <div class="hs-manage-wrap">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">Upload images for each handshape. Double-click any letter in the strip to upload directly.</p>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+        <input type="text" id="newHsInput" placeholder="New handshape (e.g. A, ILY...)" maxlength="6" style="font-size:13px;padding:7px 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);outline:none;width:240px;" onkeydown="if(event.key==='Enter')addHandshape()"/>
+        <button class="btn btn-primary" onclick="addHandshape()"><i class="ti ti-plus"></i> Add handshape</button>
+      </div>
+      <div class="hs-manage-grid" id="hsMgGrid"></div>
+    </div>
+  </div>
+
+  <!-- Feedback tab -->
+  <div class="admin-tab-panel" id="apFeedback">
+    <div class="fb-admin-wrap">
+      <div class="fb-admin-filters">
+        <select id="fbFilterType" onchange="renderFeedbackAdmin()"><option value="">All types</option><option>Bug</option><option>Suggestion</option><option>Other</option><option>General</option></select>
+        <select id="fbFilterStars" onchange="renderFeedbackAdmin()"><option value="">All ratings</option><option value="5">5 ★</option><option value="4">4 ★</option><option value="3">3 ★</option><option value="2">2 ★</option><option value="1">1 ★</option></select>
+        <button class="btn" onclick="renderFeedbackAdmin()"><i class="ti ti-refresh"></i> Refresh</button>
+      </div>
+      <div id="fbAdminList"><p style="color:var(--text3);font-size:13px;">Loading feedback...</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ABOUT -->
+<div class="page" id="pageAbout">
+  <div style="max-width:600px;margin:40px auto;background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;">
+    <h2 style="font-size:20px;font-weight:500;margin-bottom:8px;">About SignBiz</h2>
+    <p style="color:var(--text2);line-height:1.7;margin-bottom:12px;">SignBiz is a business sign language dictionary for Deaf and hard-of-hearing students.</p>
+    <button class="btn" style="margin-top:16px;" onclick="showPage('dict')"><i class="ti ti-arrow-left"></i> Back to dictionary</button>
+  </div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box">
+    <div class="modal-title"><span id="modalTitle">Add new sign</span><span class="modal-close-x" onclick="closeEditModal()"><i class="ti ti-x"></i></span></div>
+    <div class="form-grid">
+      <div class="form-field"><label>English name *</label><input type="text" id="fEn" placeholder="e.g. Meeting"/></div>
+      <div class="form-field"><label>Spanish (Español)</label><input type="text" id="fEs" placeholder="e.g. Reunión"/></div>
+    </div>
+    <!-- Category multi-select -->
+    <div class="form-field">
+      <label>Category * <button type="button" onclick="inlineAddOption('cat')" style="margin-left:6px;font-size:11px;padding:2px 8px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+ Add</button></label>
+      <div class="ms-wrap" id="fCatChips"></div>
+    </div>
+    <!-- Topic multi-select -->
+    <div class="form-field">
+      <label>Topic / Subject <button type="button" onclick="inlineAddOption('topic')" style="margin-left:6px;font-size:11px;padding:2px 8px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+ Add</button></label>
+      <div class="ms-wrap" id="fTopicChips"></div>
+    </div>
+    <div class="form-grid">
+      <!-- Handshape multi-select -->
+      <div class="form-field">
+        <label>Handshape * <button type="button" onclick="inlineAddOption('hand')" style="margin-left:4px;font-size:11px;padding:2px 6px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+</button></label>
+        <div class="ms-wrap" id="fHandChips"></div>
+      </div>
+      <!-- Difficulty single-select -->
+      <div class="form-field">
+        <label>Difficulty <button type="button" onclick="inlineAddOption('diff')" style="margin-left:4px;font-size:11px;padding:2px 6px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+</button></label>
+        <div class="ms-wrap" id="fDiffChips"></div>
+      </div>
+    </div>
+    <div class="form-field"><label>How to sign (description)</label><textarea id="fDesc" placeholder="Describe the hand movement step by step..."></textarea></div>
+    <!-- YouTube IDs -->
+    <div style="background:var(--bg2);border-radius:var(--r-md);padding:12px 14px;margin-bottom:14px;">
+      <p style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;"><i class="ti ti-brand-youtube" style="color:#FF0000;margin-right:5px;"></i>YouTube Video IDs (Unlisted)</p>
+      <div class="form-grid">
+        <div class="form-field" style="margin-bottom:8px;"><label style="color:var(--vhow);">● How to Sign</label><input type="text" id="fVidHow" placeholder="e.g. dQw4w9WgXcQ"/><p class="yt-hint">youtube.com/watch?v=<strong>THIS_PART</strong></p></div>
+        <div class="form-field" style="margin-bottom:8px;"><label style="color:var(--vconcept);">● Concept</label><input type="text" id="fVidConcept" placeholder="e.g. dQw4w9WgXcQ"/></div>
+        <div class="form-field" style="margin-bottom:0;grid-column:1/-1;"><label style="color:var(--vexample);">● Example</label><input type="text" id="fVidExample" placeholder="e.g. dQw4w9WgXcQ"/></div>
+      </div>
+    </div>
+    <!-- Custom fields -->
+    <div id="fCustomFields"></div>
+    <!-- Special tags -->
+    <div class="form-field">
+      <label>Special tags <button type="button" onclick="inlineAddOption('tag')" style="margin-left:6px;font-size:11px;padding:2px 8px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+ Add tag</button></label>
+      <div class="ms-wrap" id="formTags"></div>
+    </div>
+    <div class="form-footer">
+      <button class="btn" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSign()">Save sign</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE MODAL -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-box" style="max-width:380px;">
+    <div class="modal-title"><span>Delete sign</span><span class="modal-close-x" onclick="closeDeleteModal()"><i class="ti ti-x"></i></span></div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:6px;">Are you sure you want to delete:</p>
+    <p style="font-size:15px;font-weight:500;" id="deleteSignName"></p>
+    <p style="font-size:12px;color:var(--text3);margin-top:4px;">This cannot be undone.</p>
+    <div class="form-footer"><button class="btn" onclick="closeDeleteModal()">Cancel</button><button class="btn btn-danger" onclick="confirmDelete()">Delete</button></div>
+  </div>
+</div>
+
+<!-- FULLSCREEN VIDEO -->
+<div class="modal-overlay" id="fsModal">
+  <iframe class="modal-video" id="fsIframe" allow="autoplay; fullscreen" allowfullscreen></iframe>
+  <button class="modal-close-btn" onclick="closeFsModal()"><i class="ti ti-x"></i> Close</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, addDoc, getDoc, query, orderBy }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+/* ══════════════════════════════════════
+   🔧 PASTE YOUR FIREBASE CONFIG HERE
+══════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey: "AIzaSyASjQw0LIHN_mxabrhXjnS4AUD4Hnq_2DY",
+  authDomain: "business-63d94.firebaseapp.com",
+  projectId: "business-63d94",
+  storageBucket: "business-63d94.firebasestorage.app",
+  messagingSenderId: "583590102423",
+  appId: "1:583590102423:web:ac7b09b1cfc6a62c2e30d2"
+};
+/* ══════════════════════════════════════ */
+
+const app  = initializeApp(firebaseConfig);
+const db   = getFirestore(app);
+const auth = getAuth(app);
+const gp   = new GoogleAuthProvider();
+
+/* ══ STATE ══ */
+let WORDS        = [];
+let CATEGORIES   = ["Greetings","Meetings","Time","Documents","Communication","Numbers","Other"];
+let DIFFICULTIES = ["Beginner","Intermediate","Advanced"];
+let TOPICS       = ["Workplace","Finance","HR","Customer Service","Technology","Leadership"];
+let SPECIAL_TAGS = ["Two-handed","One-handed","Symmetric","Body contact","Facial expression","Slow motion","High frequency"];
+let HANDSHAPES   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+let CUSTOM_FIELDS = []; // [{id, name, type, options:[]}]
+let hsImageMap   = {};
+let FEEDBACKS    = [];
+
+let activeAZ       = null;
+let activeSpecial  = [];
+let activeFilters  = {}; // fieldKey → [values] for multiselect filters
+let activeWord     = null;
+let activeVideoType = 'how';
+let editingId      = null;
+let deletingId     = null;
+let editFormSpecial = [];
+let editFormValues  = {}; // fieldKey → value(s)
+let currentLang    = 'en';
+let currentUser    = null;
+
+// Feedback state
+let fbRating   = 0;
+let fbType     = '';
+let fbSignId   = null; // null = general
+
+const CAT_C = {"Greetings":["#EEEDFE","#534AB7"],"Meetings":["#E1F5EE","#0F6E56"],"Time":["#FAEEDA","#854F0B"],"Documents":["#FAECE7","#993C1D"],"Communication":["#E6F1FB","#185FA5"],"Numbers":["#EAF3DE","#3B6D11"],"Other":["#F1EFE8","#5F5E5A"]};
+const DIFF_C  = {"Beginner":["#E1F5EE","#0F6E56"],"Intermediate":["#FAEEDA","#854F0B"],"Advanced":["#FAECE7","#993C1D"]};
+const VID_META = {
+  how:     {icon:'ti-hand-finger', label:'How to Sign', color:'var(--vhow)',     light:'var(--vhow-light)'},
+  concept: {icon:'ti-bulb',        label:'Concept',     color:'var(--vconcept)', light:'var(--vconcept-light)'},
+  example: {icon:'ti-message',     label:'Example',     color:'var(--vexample)', light:'var(--vexample-light)'},
+};
+
+/* ══ FIRESTORE ══ */
+function showSaving(on){ document.getElementById('savingIndicator').style.display=on?'flex':'none'; }
+
+async function loadAll() {
+  const snap = await getDocs(collection(db,'signs'));
+  WORDS = snap.docs.map(d=>({id:d.id,...d.data()}));
+  const optSnap = await getDoc(doc(db,'_meta','options'));
+  if (optSnap.exists()) {
+    const d=optSnap.data();
+    if(d.categories)    CATEGORIES    = d.categories;
+    if(d.difficulties)  DIFFICULTIES  = d.difficulties;
+    if(d.topics)        TOPICS        = d.topics;
+    if(d.tags)          SPECIAL_TAGS  = d.tags;
+    if(d.handshapes)    HANDSHAPES    = d.handshapes;
+    if(d.hsImages)      hsImageMap    = d.hsImages;
+    if(d.customFields)  CUSTOM_FIELDS = d.customFields;
+  }
+}
+
+async function saveOptions() {
+  showSaving(true);
+  await setDoc(doc(db,'_meta','options'),{
+    categories:CATEGORIES, difficulties:DIFFICULTIES, topics:TOPICS,
+    tags:SPECIAL_TAGS, handshapes:HANDSHAPES, hsImages:hsImageMap, customFields:CUSTOM_FIELDS
+  });
+  showSaving(false);
+}
+
+async function saveWord(w) { showSaving(true); await setDoc(doc(db,'signs',String(w.id)),w); showSaving(false); }
+async function deleteWord(id) { showSaving(true); await deleteDoc(doc(db,'signs',String(id))); showSaving(false); }
+
+async function loadFeedback() {
+  const snap = await getDocs(query(collection(db,'feedback'), orderBy('ts','desc')));
+  FEEDBACKS = snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+
+/* ══ AUTH ══ */
+window.loginEmail_pw = async function() {
+  const e=document.getElementById('loginEmail').value.trim(), p=document.getElementById('loginPassword').value;
+  const err=document.getElementById('loginError'); err.style.display='none';
+  try{ await signInWithEmailAndPassword(auth,e,p); } catch(ex){ err.textContent=ex.message; err.style.display='block'; }
+};
+window.loginGoogle  = async function(){ try{ await signInWithPopup(auth,gp); }catch(ex){ showToast('Google error: '+ex.message); } };
+window.cancelLogin  = function(){ showPage('dict'); };
+window.doLogout     = async function(){ await signOut(auth); showToast('Signed out'); };
+
+onAuthStateChanged(auth, user => {
+  currentUser=user;
+  const uEl=document.getElementById('headerUser'), aBtn=document.getElementById('adminNavBtn'),
+        lBtn=document.getElementById('loginNavBtn'), oBtn=document.getElementById('logoutBtn');
+  if(user){
+    uEl.style.display='flex';
+    uEl.innerHTML=user.photoURL?`<img src="${user.photoURL}"/><span>${user.displayName||user.email}</span>`:`<i class="ti ti-user-circle"></i><span>${user.email}</span>`;
+    aBtn.style.display='flex'; lBtn.style.display='none'; oBtn.style.display='flex';
+    if(document.getElementById('pageLogin').classList.contains('active')) showPage('dict');
+  } else {
+    uEl.style.display='none'; aBtn.style.display='none'; lBtn.style.display='flex'; oBtn.style.display='none';
+    if(document.getElementById('pageAdmin').classList.contains('active')) showPage('dict');
+  }
+});
+
+/* ══ PAGE ROUTING ══ */
+window.showPage = function(p) {
+  if(p==='admin'&&!currentUser){ showPage('login'); return; }
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  if(p==='login')  { document.getElementById('pageLogin').classList.add('active'); }
+  else if(p==='dict')  { document.getElementById('pageDict').classList.add('active'); document.getElementById('navDict').classList.add('active'); }
+  else if(p==='admin') { document.getElementById('pageAdmin').classList.add('active'); switchAdminTab('signs'); renderAdminTable(); }
+  else if(p==='about') { document.getElementById('pageAbout').classList.add('active'); document.getElementById('navAbout').classList.add('active'); }
+};
+
+/* ══ LANG ══ */
+window.setLang = function(lang) {
+  currentLang=lang;
+  document.querySelectorAll('.lang-btn').forEach((b,i)=>b.classList.toggle('active',(i===0&&lang==='en')||(i===1&&lang==='es')));
+  doFilter();
+  if(activeWord){ const w=WORDS.find(x=>x.id===activeWord); if(w) renderDetail(w); }
+};
+
+/* ══ HANDSHAPE STRIP ══ */
+function buildHsGrid() {
+  const grid=document.getElementById('hsGrid'); grid.innerHTML='';
+  const handSet=new Set(WORDS.flatMap(w=>Array.isArray(w.hand)?w.hand:[w.hand]).filter(Boolean));
+  HANDSHAPES.forEach(l=>{
+    const has=handSet.has(l);
+    const cell=document.createElement('div');
+    cell.className='hs-cell'+(has?'':' no-data')+(activeAZ===l?' active':'');
+    if(hsImageMap[l]){ const img=document.createElement('img'); img.src=hsImageMap[l]; img.alt=l; cell.appendChild(img); }
+    else { const sp=document.createElement('span'); sp.className='hs-letter'; sp.textContent=l; cell.appendChild(sp); }
+    const badge=document.createElement('span'); badge.className='hs-badge'; badge.textContent=l; cell.appendChild(badge);
+    if(has) cell.onclick=()=>setAZ(activeAZ===l?null:l);
+    cell.addEventListener('dblclick',()=>{
+      if(!currentUser) return;
+      const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
+      inp.onchange=async e=>{ const f=e.target.files[0]; if(!f) return; hsImageMap[l]=await fileToB64(f); await saveOptions(); buildHsGrid(); renderHsMgGrid(); showToast(`Handshape ${l} updated`); };
+      inp.click();
+    });
+    grid.appendChild(cell);
+  });
+  document.getElementById('hsAllBtn').classList.toggle('active',activeAZ===null);
+}
+window.setAZ=function(l){ activeAZ=l; buildHsGrid(); doFilter(); };
+function fileToB64(f){ return new Promise(res=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.readAsDataURL(f); }); }
+
+/* ══ FILTER PANEL ══ */
+function buildFilterPanel() {
+  const wrap = document.getElementById('filterFieldsWrap');
+  wrap.innerHTML = '';
+
+  // Helper: build a filter select
+  function makeSelect(id, label, opts) {
+    const d=document.createElement('div'); d.className='adv-field';
+    d.innerHTML=`<label>${label}</label><select id="${id}" onchange="doFilter()"><option value="">All</option></select>`;
+    opts.forEach(o=>{ const el=document.createElement('option'); el.value=o; el.textContent=o; d.querySelector('select').appendChild(el); });
+    return d;
+  }
+
+  wrap.appendChild(makeSelect('fCat',   'Category',   CATEGORIES));
+  wrap.appendChild(makeSelect('fTopic', 'Topic',      TOPICS));
+  wrap.appendChild(makeSelect('fDiff',  'Difficulty', DIFFICULTIES));
+
+  // Handshape filter
+  const hands=[...new Set(WORDS.flatMap(w=>Array.isArray(w.hand)?w.hand:[w.hand]).filter(Boolean))].sort();
+  wrap.appendChild(makeSelect('fHand', 'Handshape', hands.map(h=>`Handshape ${h}`)));
+
+  // Videos filter
+  const vd=document.createElement('div'); vd.className='adv-field';
+  vd.innerHTML=`<label>Videos</label><select id="fVid" onchange="doFilter()"><option value="">All</option><option value="how">Has How-to</option><option value="concept">Has Concept</option><option value="example">Has Example</option></select>`;
+  wrap.appendChild(vd);
+
+  // Custom fields filters
+  CUSTOM_FIELDS.forEach(cf=>{
+    if(cf.type==='text') return;
+    wrap.appendChild(makeSelect('fcf_'+cf.id, cf.name, cf.options||[]));
+  });
+}
+
+function buildFilterTags() {
+  const el=document.getElementById('filterTags'); el.innerHTML='';
+  SPECIAL_TAGS.forEach(s=>{
+    const t=document.createElement('span');
+    t.className='adv-tag'+(activeSpecial.includes(s)?' on':''); t.textContent=s;
+    t.onclick=()=>{ if(activeSpecial.includes(s)) activeSpecial=activeSpecial.filter(x=>x!==s); else activeSpecial.push(s); t.classList.toggle('on'); doFilter(); };
+    el.appendChild(t);
+  });
+}
+
+/* ══ FILTER + LIST ══ */
+window.doFilter = function() {
+  const q=(document.getElementById('globalSearch').value||'').trim().toLowerCase();
+  const fCat   = document.getElementById('fCat')  ?.value || '';
+  const fTopic = document.getElementById('fTopic')?.value || '';
+  const fDiff  = document.getElementById('fDiff') ?.value || '';
+  const fHandEl= document.getElementById('fHand') ?.value || '';
+  const fHand  = fHandEl.replace('Handshape ','');
+  const fVid   = document.getElementById('fVid')  ?.value || '';
+
+  const list = WORDS.filter(w=>{
+    if(q && !w.en.toLowerCase().includes(q) && !(w.es||'').toLowerCase().includes(q)) return false;
+    const cats  = Array.isArray(w.cat)   ? w.cat   : (w.cat   ? [w.cat]   : []);
+    const tops  = Array.isArray(w.topic) ? w.topic : (w.topic ? [w.topic] : []);
+    const hands = Array.isArray(w.hand)  ? w.hand  : (w.hand  ? [w.hand]  : []);
+    if(fCat   && !cats.includes(fCat))   return false;
+    if(fTopic && !tops.includes(fTopic)) return false;
+    if(fDiff  && w.diff!==fDiff)         return false;
+    if(activeAZ && !hands.includes(activeAZ)) return false;
+    if(fHand  && !hands.includes(fHand)) return false;
+    if(fVid   && !w['vid_'+fVid])        return false;
+    if(activeSpecial.length && !activeSpecial.every(s=>(w.special||[]).includes(s))) return false;
+    // Custom field filters
+    for(const cf of CUSTOM_FIELDS) {
+      if(cf.type==='text') continue;
+      const fVal = document.getElementById('fcf_'+cf.id)?.value||'';
+      if(!fVal) continue;
+      const wVal = w['cf_'+cf.id];
+      const wArr = Array.isArray(wVal)?wVal:(wVal?[wVal]:[]);
+      if(!wArr.includes(fVal)) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('resultCount').textContent =
+    list.length===WORDS.length?`${list.length} signs`:`${list.length} of ${WORDS.length} signs`;
+
+  const el=document.getElementById('wordList');
+  if(!list.length){ el.innerHTML='<div class="no-results">No signs match your filters.</div>'; return; }
+  el.innerHTML=list.map(w=>{
+    const cats=Array.isArray(w.cat)?w.cat:(w.cat?[w.cat]:[]);
+    const cc=CAT_C[cats[0]]||["#F1EFE8","#444441"];
+    const sub=currentLang==='es'&&w.es?w.es:(cats[0]||'');
+    const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
+    return `<div class="word-row${activeWord===w.id?' active':''}" onclick="selectWord('${w.id}')">
+      <span class="word-en">${w.en}</span>
+      <span class="word-sub">${sub}</span>
+      <span class="pill" style="background:${cc[0]};color:${cc[1]}">${hands[0]||''}</span>
+    </div>`;
+  }).join('');
+};
+
+window.resetFilters=function(){
+  ['fCat','fTopic','fDiff','fHand','fVid'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  CUSTOM_FIELDS.forEach(cf=>{ const el=document.getElementById('fcf_'+cf.id); if(el) el.value=''; });
+  activeSpecial=[]; activeAZ=null;
+  document.querySelectorAll('#filterTags .adv-tag').forEach(t=>t.classList.remove('on'));
+  buildHsGrid(); doFilter();
+};
+window.toggleAdv=function(){ document.getElementById('advPanel').classList.toggle('show'); document.getElementById('advToggle').classList.toggle('open'); };
+
+/* ══ DETAIL VIEW ══ */
+window.selectWord=function(id){ const w=WORDS.find(x=>x.id===id); if(!w) return; activeWord=w.id; activeVideoType='how'; doFilter(); renderDetail(w); };
+
+function renderDetail(w) {
+  const cats  = Array.isArray(w.cat)   ? w.cat   : (w.cat   ? [w.cat]   : []);
+  const hands = Array.isArray(w.hand)  ? w.hand  : (w.hand  ? [w.hand]  : []);
+  const tops  = Array.isArray(w.topic) ? w.topic : (w.topic ? [w.topic] : []);
+  const dc=DIFF_C[w.diff]||["#F1EFE8","#444441"];
+
+  const catPills=cats.map(c=>{ const cc=CAT_C[c]||["#F1EFE8","#444441"]; return `<span class="pill" style="background:${cc[0]};color:${cc[1]}">${c}</span>`; }).join('');
+  const topPills=tops.map(t=>`<span class="pill" style="background:#EAF3DE;color:#3B6D11;"><i class="ti ti-tag" style="font-size:9px;margin-right:2px;"></i>${t}</span>`).join('');
+  const handPills=hands.map(h=>`<span class="pill" style="background:var(--accent-light);color:var(--accent)">Handshape ${h}</span>`).join('');
+  const specialPills=(w.special||[]).map(s=>`<span class="pill" style="background:var(--bg2);color:var(--text2);border:0.5px solid var(--border)">${s}</span>`).join('');
+
+  // Custom field pills
+  const cfPills=CUSTOM_FIELDS.map(cf=>{
+    const val=w['cf_'+cf.id];
+    if(!val||(Array.isArray(val)&&!val.length)) return '';
+    const vals=Array.isArray(val)?val:[val];
+    return vals.map(v=>`<span class="pill" style="background:#F1EFE8;color:#5F5E5A;border:0.5px solid var(--border)">${cf.name}: ${v}</span>`).join('');
+  }).join('');
+
+  const tabs=['how','concept','example'].map(type=>{
+    const m=VID_META[type]; const isActive=type===activeVideoType;
+    return `<div class="vid-tab${isActive?' active':''}" data-type="${type}" onclick="switchVideoTab('${w.id}','${type}')"><i class="ti ${m.icon}"></i><span>${m.label}</span></div>`;
+  }).join('');
+
+  const ytId=w['vid_'+activeVideoType];
+  const videoHtml=ytId
+    ?`<iframe src="https://www.youtube.com/embed/${ytId}?rel=0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe>
+      <button style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.55);border:none;border-radius:var(--r-sm);padding:5px 10px;color:white;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="openFsModal('${ytId}')"><i class="ti ti-maximize"></i> Fullscreen</button>`
+    :`<div class="vid-ph"><i class="ti ti-video-off"></i><p>No video yet for <strong>${VID_META[activeVideoType].label}</strong></p></div>`;
+
+  // Custom field details
+  const cfDetails=CUSTOM_FIELDS.map(cf=>{
+    const val=w['cf_'+cf.id];
+    if(!val||(Array.isArray(val)&&!val.length)) return '';
+    const vals=Array.isArray(val)?val.join(', '):val;
+    return `<p style="font-size:12px;color:var(--text2);margin-top:6px;"><strong style="color:var(--text);">${cf.name}:</strong> ${vals}</p>`;
+  }).join('');
+
+  document.getElementById('rightPanel').innerHTML=`
+    <div class="detail-card">
+      <p class="entry-en">${w.en}</p>
+      ${w.es?`<p class="entry-es">${w.es}</p>`:''}
+      <div class="entry-tags">${catPills}${topPills}${handPills}<span class="pill" style="background:${dc[0]};color:${dc[1]}">${w.diff||''}</span>${specialPills}${cfPills}</div>
+      <div class="vid-tabs">${tabs}</div>
+      <div class="video-box">${videoHtml}</div>
+      <p class="entry-desc"><strong>How to sign:</strong> ${w.desc||''}</p>
+      ${cfDetails}
+      <!-- FEEDBACK -->
+      <div class="feedback-wrap">
+        <div class="feedback-title"><i class="ti ti-message-circle"></i> Leave Feedback</div>
+        <div class="star-row" id="starRow_${w.id}">
+          ${[1,2,3,4,5].map(n=>`<span class="star" onclick="setFbRating(${n},'${w.id}')" onmouseover="hoverStars(${n},'${w.id}')" onmouseout="resetStarHover('${w.id}')">★</span>`).join('')}
+        </div>
+        <div class="fb-type-row">
+          ${['Bug','Suggestion','Other'].map(t=>`<span class="fb-type" onclick="setFbType('${t}','${w.id}')">${t}</span>`).join('')}
+        </div>
+        <textarea class="fb-textarea" id="fbText_${w.id}" placeholder="Your feedback (optional)..."></textarea>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="fb-submit" onclick="submitFeedback('${w.id}')">Send feedback</button>
+          <span class="fb-success" id="fbSuccess_${w.id}"><i class="ti ti-circle-check"></i> Thank you!</span>
+        </div>
+      </div>
+    </div>`;
+  fbSignId=w.id; fbRating=0; fbType='';
+}
+
+window.switchVideoTab=function(wId,type){ const w=WORDS.find(x=>x.id===wId); if(!w) return; activeVideoType=type; renderDetail(w); };
+window.openFsModal=function(ytId){ document.getElementById('fsIframe').src=`https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0`; document.getElementById('fsModal').classList.add('show'); };
+window.closeFsModal=function(){ document.getElementById('fsIframe').src=''; document.getElementById('fsModal').classList.remove('show'); };
+
+/* ══ FEEDBACK ══ */
+window.setFbRating=function(n, wId){ fbRating=n; updateStars(n, wId); };
+window.hoverStars=function(n, wId){ updateStars(n, wId); };
+window.resetStarHover=function(wId){ updateStars(fbRating, wId); };
+function updateStars(n, wId){
+  const stars=document.querySelectorAll(`#starRow_${wId} .star`);
+  stars.forEach((s,i)=>s.classList.toggle('on',i<n));
+}
+window.setFbType=function(t, wId){
+  fbType=t;
+  document.querySelectorAll(`#rightPanel .fb-type`).forEach(el=>el.classList.toggle('on',el.textContent===t));
+};
+window.submitFeedback=async function(wId){
+  const text=document.getElementById(`fbText_${wId}`)?.value.trim()||'';
+  if(!fbRating&&!text){ showToast('Please add a rating or comment.'); return; }
+  const w=WORDS.find(x=>x.id===wId);
+  await addDoc(collection(db,'feedback'),{
+    signId: wId,
+    signName: w?.en||'',
+    rating: fbRating,
+    type: fbType||'Other',
+    text,
+    ts: Date.now(),
+    scope: 'sign'
+  });
+  const sEl=document.getElementById(`fbSuccess_${wId}`);
+  if(sEl){ sEl.style.display='flex'; setTimeout(()=>sEl.style.display='none',3000); }
+  document.getElementById(`fbText_${wId}`).value='';
+  fbRating=0; fbType='';
+  updateStars(0,wId);
+  document.querySelectorAll('#rightPanel .fb-type').forEach(el=>el.classList.remove('on'));
+  showToast('Feedback submitted!');
+};
+
+/* ══ ADMIN TABLE ══ */
+function renderAdminTable(){
+  document.getElementById('adminSub').textContent=`${WORDS.length} signs · ${CATEGORIES.length} categories · ${SPECIAL_TAGS.length} tags`;
+  document.getElementById('adminTbody').innerHTML=WORDS.map(w=>{
+    const cats=Array.isArray(w.cat)?w.cat:(w.cat?[w.cat]:[]);
+    const cc=CAT_C[cats[0]]||["#F1EFE8","#444441"];
+    const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
+    const dots=['how','concept','example'].map(t=>`<span class="vdot ${w['vid_'+t]?'on':'off'}" title="${VID_META[t].label}"></span>`).join('');
+    return `<tr>
+      <td style="font-weight:500">${w.en}</td>
+      <td style="color:var(--text2);font-style:italic">${w.es||'—'}</td>
+      <td>${cats.map(c=>`<span class="pill" style="background:${(CAT_C[c]||["#F1EFE8","#444441"])[0]};color:${(CAT_C[c]||["#F1EFE8","#444441"])[1]};margin-right:2px;">${c}</span>`).join('')}</td>
+      <td>${hands.map(h=>`<span class="pill" style="background:var(--accent-light);color:var(--accent);margin-right:2px;">${h}</span>`).join('')}</td>
+      <td style="color:var(--text2)">${w.diff||''}</td>
+      <td><div style="display:flex;gap:4px;">${dots}</div></td>
+      <td><div class="row-actions">
+        <button class="row-btn" onclick="openEditModal('${w.id}')"><i class="ti ti-pencil"></i> Edit</button>
+        <button class="row-btn del" onclick="openDeleteModal('${w.id}')"><i class="ti ti-trash"></i> Delete</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ══ CHIP BUILDERS ══ */
+function buildChips(containerId, arr, selected, onToggle, singleSelect=false) {
+  const el=document.getElementById(containerId); if(!el) return;
+  el.innerHTML='';
+  arr.forEach(v=>{
+    const on=Array.isArray(selected)?selected.includes(v):selected===v;
+    const chip=document.createElement('span'); chip.className='ms-chip'+(on?' on':''); chip.textContent=v;
+    chip.onclick=()=>{
+      if(singleSelect){ onToggle(v); return; }
+      const nowOn=chip.classList.toggle('on');
+      onToggle(v,nowOn);
+    };
+    el.appendChild(chip);
+  });
+}
+
+/* ══ EDIT MODAL ══ */
+window.openAddModal=function(){
+  editingId=null; editFormSpecial=[]; editFormValues={};
+  document.getElementById('modalTitle').textContent='Add new sign';
+  ['fEn','fEs','fDesc','fVidHow','fVidConcept','fVidExample'].forEach(id=>document.getElementById(id).value='');
+  buildModalChips({});
+  document.getElementById('editModal').classList.add('show');
+};
+
+window.openEditModal=function(id){
+  const w=WORDS.find(x=>x.id===id); if(!w) return;
+  editingId=id; editFormSpecial=[...(w.special||[])];
+  editFormValues={};
+  CUSTOM_FIELDS.forEach(cf=>{ editFormValues['cf_'+cf.id]=w['cf_'+cf.id]||(cf.type==='multiselect'?[]:''); });
+  document.getElementById('modalTitle').textContent='Edit sign';
+  document.getElementById('fEn').value   = w.en||'';
+  document.getElementById('fEs').value   = w.es||'';
+  document.getElementById('fDesc').value = w.desc||'';
+  document.getElementById('fVidHow').value     = w.vid_how||'';
+  document.getElementById('fVidConcept').value = w.vid_concept||'';
+  document.getElementById('fVidExample').value = w.vid_example||'';
+  buildModalChips(w);
+  document.getElementById('editModal').classList.add('show');
+};
+
+function buildModalChips(w) {
+  // Category multi
+  const selCats=Array.isArray(w.cat)?w.cat:(w.cat?[w.cat]:[]);
+  let curCats=[...selCats];
+  buildChips('fCatChips', CATEGORIES, curCats, (v,on)=>{ if(on) curCats.push(v); else curCats=curCats.filter(x=>x!==v); editFormValues.cat=curCats; });
+  editFormValues.cat=curCats;
+
+  // Topic multi
+  const selTops=Array.isArray(w.topic)?w.topic:(w.topic?[w.topic]:[]);
+  let curTops=[...selTops];
+  buildChips('fTopicChips', TOPICS, curTops, (v,on)=>{ if(on) curTops.push(v); else curTops=curTops.filter(x=>x!==v); editFormValues.topic=curTops; });
+  editFormValues.topic=curTops;
+
+  // Handshape multi
+  const selHands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
+  let curHands=[...selHands];
+  buildChips('fHandChips', HANDSHAPES, curHands, (v,on)=>{ if(on) curHands.push(v); else curHands=curHands.filter(x=>x!==v); editFormValues.hand=curHands; });
+  editFormValues.hand=curHands;
+
+  // Difficulty single
+  let curDiff=w.diff||DIFFICULTIES[0]||'';
+  buildChips('fDiffChips', DIFFICULTIES, curDiff, (v)=>{
+    curDiff=v; editFormValues.diff=v;
+    document.querySelectorAll('#fDiffChips .ms-chip').forEach(c=>c.classList.toggle('on',c.textContent===v));
+  }, true);
+  editFormValues.diff=curDiff;
+
+  // Special tags
+  buildChips('formTags', SPECIAL_TAGS, editFormSpecial, (v,on)=>{ if(on) editFormSpecial.push(v); else editFormSpecial=editFormSpecial.filter(x=>x!==v); });
+
+  // Custom fields
+  const cfWrap=document.getElementById('fCustomFields'); cfWrap.innerHTML='';
+  CUSTOM_FIELDS.forEach(cf=>{
+    const fd=document.createElement('div'); fd.className='form-field';
+    const lbl=document.createE
