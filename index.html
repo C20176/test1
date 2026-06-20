@@ -10,19 +10,30 @@
 ║  SIGNBIZ SETUP                                                   ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║  1. Paste your Firebase config in the firebaseConfig block       ║
-║  2. Firestore Security Rules:                                    ║
+║  2. Firestore Security Rules — paste this EXACT block in         ║
+║     Firebase Console → Firestore Database → Rules → Publish:     ║
+║                                                                    ║
 ║     rules_version = '2';                                         ║
 ║     service cloud.firestore {                                    ║
 ║       match /databases/{database}/documents {                    ║
-║         match /{document=**} {                                   ║
+║         match /signs/{id} {                                      ║
 ║           allow read: if true;                                   ║
 ║           allow write: if request.auth != null;                  ║
 ║         }                                                        ║
+║         match /_meta/{id} {                                      ║
+║           allow read: if true;                                   ║
+║           allow write: if request.auth != null;                  ║
+║         }                                                        ║
+║         match /feedback/{id} {                                   ║
+║           allow create: if true;                                 ║
+║           allow read, update, delete: if request.auth != null;   ║
+║         }                                                        ║
 ║       }                                                          ║
 ║     }                                                            ║
-║  NOTE: feedback collection allows public write (anyone can       ║
-║  submit). Add this rule for feedback:                            ║
-║     match /feedback/{id} { allow write: if true; }               ║
+║                                                                    ║
+║  IMPORTANT: feedback needs "allow create: if true" so visitors   ║
+║  who are NOT logged in can submit feedback. Without this rule,   ║
+║  the feedback form will silently fail for non-admin visitors.    ║
 ╚══════════════════════════════════════════════════════════════════╝
 -->
 <style>
@@ -392,7 +403,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   <!-- Options tab -->
   <div class="admin-tab-panel" id="apOptions">
     <div class="options-wrap" style="grid-template-columns:1fr;margin-bottom:0;padding-bottom:0;">
-      <div class="cf-new-row">
+      <div class="cf-new-row" style="flex-wrap:wrap;">
         <div class="form-field"><label>New category name</label><input type="text" id="newFieldName" placeholder="e.g. Region, Industry, Register..."/></div>
         <div class="form-field" style="max-width:180px;"><label>Type</label>
           <select id="newFieldType">
@@ -400,8 +411,10 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
             <option value="singleselect">Single-select</option>
           </select>
         </div>
+        <div class="form-field" style="flex:2;"><label>Starting options (comma-separated)</label><input type="text" id="newFieldOptions" placeholder="e.g. North, South, East, West"/></div>
         <div style="padding-bottom:0;"><button class="btn btn-primary" onclick="addNewCategoryBlock()" style="margin-top:20px;"><i class="ti ti-plus"></i> New category</button></div>
       </div>
+      <p class="options-note" style="margin-top:-8px;margin-bottom:14px;">⚠ Add at least one option now, or the category will show empty in the sign editor — you can always add more later.</p>
     </div>
     <div class="options-wrap" id="optionsCardsWrap"></div>
   </div>
@@ -531,8 +544,6 @@ const firebaseConfig = {
   messagingSenderId: "278584330390",
   appId: "1:278584330390:web:ed266628f91b84c6fc9ab7"
 };
-
-
 /* ══════════════════════════════════════ */
 
 const app  = initializeApp(firebaseConfig);
@@ -874,15 +885,21 @@ window.submitFeedback=async function(wId){
   const text=document.getElementById(`fbText_${wId}`)?.value.trim()||'';
   if(!fbRating&&!text){ showToast('Please add a rating or comment.'); return; }
   const w=WORDS.find(x=>x.id===wId);
-  await addDoc(collection(db,'feedback'),{
-    signId: wId,
-    signName: w?.en||'',
-    rating: fbRating,
-    type: fbType||'Other',
-    text,
-    ts: Date.now(),
-    scope: 'sign'
-  });
+  try{
+    await addDoc(collection(db,'feedback'),{
+      signId: wId,
+      signName: w?.en||'',
+      rating: fbRating,
+      type: fbType||'Other',
+      text,
+      ts: Date.now(),
+      scope: 'sign'
+    });
+  } catch(err){
+    console.error('Feedback submit failed:', err);
+    showToast('⚠ Could not send feedback. Please try again later.');
+    return;
+  }
   const sEl=document.getElementById(`fbSuccess_${wId}`);
   if(sEl){ sEl.style.display='flex'; setTimeout(()=>sEl.style.display='none',3000); }
   document.getElementById(`fbText_${wId}`).value='';
@@ -995,6 +1012,11 @@ function buildModalChips(w) {
     fd.appendChild(lbl);
     const ms=document.createElement('div'); ms.className='ms-wrap'; ms.id='cfChips_'+cf.id;
     fd.appendChild(ms);
+    if(!cf.options||!cf.options.length){
+      const hint=document.createElement('p'); hint.style.cssText='font-size:11px;color:var(--text3);margin-top:4px;';
+      hint.textContent='No options yet — click "+ Add" above to create one.';
+      fd.appendChild(hint);
+    }
     const isSingle=cf.type==='singleselect';
     let cur=w['cf_'+cf.id]||(isSingle?'':[]); if(!Array.isArray(cur)&&!isSingle) cur=cur?[cur]:[];
     buildChips('cfChips_'+cf.id, cf.options||[], cur, (v,on)=>{
@@ -1105,6 +1127,7 @@ function makeOptionCard(title,key,arr,type,subtitle,isCustom,wide=false){
 function renderCategoryValueList(listId,arr,key,wide){
   const el=document.getElementById(listId); if(!el) return;
   el.innerHTML='';
+  if(!arr.length){ el.innerHTML='<p style="font-size:11px;color:var(--text3);padding:4px 2px;">No options yet — add one below.</p>'; return; }
   arr.forEach((val,i)=>{
     const row=document.createElement('div');
     if(wide){
@@ -1172,13 +1195,16 @@ window.deleteCategoryValue=async function(key,i){
 window.addNewCategoryBlock=async function(){
   const name=document.getElementById('newFieldName').value.trim();
   const type=document.getElementById('newFieldType').value;
+  const optsRaw=document.getElementById('newFieldOptions').value.trim();
   if(!name){ showToast('Please enter a category name.'); return; }
   if(CUSTOM_FIELDS.find(f=>f.name===name)){ showToast('A category with that name already exists.'); return; }
-  CUSTOM_FIELDS.push({id:'cf_'+Date.now(), name, type, options:[]});
+  const options = optsRaw ? optsRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
+  CUSTOM_FIELDS.push({id:'cf_'+Date.now(), name, type, options});
   document.getElementById('newFieldName').value='';
+  document.getElementById('newFieldOptions').value='';
   await saveOptions();
   buildFilterPanel(); renderOptionsPanel();
-  showToast(`Category "${name}" created`);
+  showToast(`Category "${name}" created${options.length?` with ${options.length} option(s)`:''}`);
 };
 
 window.deleteCustomCategory=async function(key){
