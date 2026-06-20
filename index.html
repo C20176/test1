@@ -375,7 +375,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   <div class="admin-tabs">
     <div class="admin-tab active" id="atSigns" onclick="switchAdminTab('signs')">Signs</div>
     <div class="admin-tab" id="atOptions" onclick="switchAdminTab('options')">Categories &amp; Tags</div>
-    <div class="admin-tab" id="atFields" onclick="switchAdminTab('fields')">Custom Fields</div>
     <div class="admin-tab" id="atHandshapes" onclick="switchAdminTab('handshapes')">Handshape Images</div>
     <div class="admin-tab" id="atFeedback" onclick="switchAdminTab('feedback')">Feedback</div>
   </div>
@@ -392,51 +391,19 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 
   <!-- Options tab -->
   <div class="admin-tab-panel" id="apOptions">
-    <div class="options-wrap">
-      <div class="options-card">
-        <div class="options-card-title">Categories</div>
-        <div class="options-card-sub">Multi-select on each sign.</div>
-        <div class="options-list" id="catList"></div>
-        <div class="options-add-row"><input type="text" id="newCatInput" placeholder="New category..." onkeydown="if(event.key==='Enter')addOption('cat')"/><button onclick="addOption('cat')">Add</button></div>
-      </div>
-      <div class="options-card">
-        <div class="options-card-title">Topics / Subjects</div>
-        <div class="options-card-sub">Multi-select on each sign.</div>
-        <div class="options-list" id="topicList"></div>
-        <div class="options-add-row"><input type="text" id="newTopicInput" placeholder="New topic..." onkeydown="if(event.key==='Enter')addOption('topic')"/><button onclick="addOption('topic')">Add</button></div>
-      </div>
-      <div class="options-card">
-        <div class="options-card-title">Difficulty Levels</div>
-        <div class="options-card-sub">Single-select on each sign.</div>
-        <div class="options-list" id="diffList"></div>
-        <div class="options-add-row"><input type="text" id="newDiffInput" placeholder="New level..." onkeydown="if(event.key==='Enter')addOption('diff')"/><button onclick="addOption('diff')">Add</button></div>
-      </div>
-      <div class="options-card" style="grid-column:1/-1;">
-        <div class="options-card-title">Special Tags</div>
-        <div class="options-card-sub">Multi-select tags for filtering.</div>
-        <div class="options-list" id="tagList" style="flex-direction:row;flex-wrap:wrap;max-height:none;"></div>
-        <div class="options-add-row" style="margin-top:10px;"><input type="text" id="newTagInput" placeholder="New tag..." onkeydown="if(event.key==='Enter')addOption('tag')"/><button onclick="addOption('tag')">Add</button></div>
-        <p class="options-note">⚠ Deleting a tag removes it from all signs.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Custom Fields tab -->
-  <div class="admin-tab-panel" id="apFields">
-    <div class="cf-wrap">
+    <div class="options-wrap" style="grid-template-columns:1fr;margin-bottom:0;padding-bottom:0;">
       <div class="cf-new-row">
-        <div class="form-field"><label>Field name</label><input type="text" id="cfNewName" placeholder="e.g. Region, Register..."/></div>
-        <div class="form-field"><label>Type</label>
-          <select id="cfNewType">
+        <div class="form-field"><label>New category name</label><input type="text" id="newFieldName" placeholder="e.g. Region, Industry, Register..."/></div>
+        <div class="form-field" style="max-width:180px;"><label>Type</label>
+          <select id="newFieldType">
             <option value="multiselect">Multi-select</option>
             <option value="singleselect">Single-select</option>
-            <option value="text">Free text</option>
           </select>
         </div>
-        <div style="padding-bottom:0;"><button class="btn btn-primary" onclick="addCustomField()" style="margin-top:20px;"><i class="ti ti-plus"></i> Add field</button></div>
+        <div style="padding-bottom:0;"><button class="btn btn-primary" onclick="addNewCategoryBlock()" style="margin-top:20px;"><i class="ti ti-plus"></i> New category</button></div>
       </div>
-      <div id="cfList"></div>
     </div>
+    <div class="options-wrap" id="optionsCardsWrap"></div>
   </div>
 
   <!-- Handshapes tab -->
@@ -556,18 +523,14 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopu
 /* ══════════════════════════════════════
    🔧 PASTE YOUR FIREBASE CONFIG HERE
 ══════════════════════════════════════ */
-
-
 const firebaseConfig = {
-  apiKey: "AIzaSyASjQw0LIHN_mxabrhXjnS4AUD4Hnq_2DY",
-  authDomain: "business-63d94.firebaseapp.com",
-  projectId: "business-63d94",
-  storageBucket: "business-63d94.firebasestorage.app",
-  messagingSenderId: "583590102423",
-  appId: "1:583590102423:web:c4f6feb3222ef2a42e30d2"
+  apiKey: "AIzaSyDxfPYsdb-zPnI42wg77zYXH6PcSU-ABCw",
+  authDomain: "signbiz-2.firebaseapp.com",
+  projectId: "signbiz-2",
+  storageBucket: "signbiz-2.firebasestorage.app",
+  messagingSenderId: "871988085904",
+  appId: "1:871988085904:web:130fac847a3c7fdd328415"
 };
-
-
 /* ══════════════════════════════════════ */
 
 const app  = initializeApp(firebaseConfig);
@@ -979,7 +942,7 @@ window.openEditModal=function(id){
   const w=WORDS.find(x=>x.id===id); if(!w) return;
   editingId=id; editFormSpecial=[...(w.special||[])];
   editFormValues={};
-  CUSTOM_FIELDS.forEach(cf=>{ editFormValues['cf_'+cf.id]=w['cf_'+cf.id]||(cf.type==='multiselect'?[]:''); });
+  CUSTOM_FIELDS.forEach(cf=>{ editFormValues['cf_'+cf.id]=w['cf_'+cf.id]||(cf.type==='singleselect'?'':[]); });
   document.getElementById('modalTitle').textContent='Edit sign';
   document.getElementById('fEn').value   = w.en||'';
   document.getElementById('fEs').value   = w.es||'';
@@ -1021,29 +984,36 @@ function buildModalChips(w) {
   // Special tags
   buildChips('formTags', SPECIAL_TAGS, editFormSpecial, (v,on)=>{ if(on) editFormSpecial.push(v); else editFormSpecial=editFormSpecial.filter(x=>x!==v); });
 
-  // Custom fields
+  // Custom fields (rendered exactly like Category/Topic — chip multi/single select)
   const cfWrap=document.getElementById('fCustomFields'); cfWrap.innerHTML='';
   CUSTOM_FIELDS.forEach(cf=>{
     const fd=document.createElement('div'); fd.className='form-field';
-    const lbl=document.createElement('label'); lbl.textContent=cf.name; fd.appendChild(lbl);
-    if(cf.type==='text'){
-      const inp=document.createElement('input'); inp.type='text'; inp.value=w['cf_'+cf.id]||'';
-      inp.oninput=()=>{ editFormValues['cf_'+cf.id]=inp.value; };
-      fd.appendChild(inp);
-    } else {
-      const ms=document.createElement('div'); ms.className='ms-wrap'; ms.id='cfChips_'+cf.id;
-      fd.appendChild(ms);
-      const isSingle=cf.type==='singleselect';
-      let cur=w['cf_'+cf.id]||(isSingle?'':[]); if(!Array.isArray(cur)&&!isSingle) cur=cur?[cur]:[];
-      buildChips('cfChips_'+cf.id, cf.options||[], cur, (v,on)=>{
-        if(isSingle){ editFormValues['cf_'+cf.id]=v; document.querySelectorAll(`#cfChips_${cf.id} .ms-chip`).forEach(c=>c.classList.toggle('on',c.textContent===v)); }
-        else { if(on) cur.push(v); else cur=cur.filter(x=>x!==v); editFormValues['cf_'+cf.id]=cur; }
-      }, isSingle);
-      editFormValues['cf_'+cf.id]=cur;
-    }
+    const lbl=document.createElement('label');
+    lbl.innerHTML=`${cf.name} <button type="button" onclick="inlineAddCustomOption('${cf.id}')" style="margin-left:4px;font-size:11px;padding:2px 8px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+ Add</button>`;
+    fd.appendChild(lbl);
+    const ms=document.createElement('div'); ms.className='ms-wrap'; ms.id='cfChips_'+cf.id;
+    fd.appendChild(ms);
+    const isSingle=cf.type==='singleselect';
+    let cur=w['cf_'+cf.id]||(isSingle?'':[]); if(!Array.isArray(cur)&&!isSingle) cur=cur?[cur]:[];
+    buildChips('cfChips_'+cf.id, cf.options||[], cur, (v,on)=>{
+      if(isSingle){ editFormValues['cf_'+cf.id]=v; document.querySelectorAll(`#cfChips_${cf.id} .ms-chip`).forEach(c=>c.classList.toggle('on',c.textContent===v)); }
+      else { if(on) cur.push(v); else cur=cur.filter(x=>x!==v); editFormValues['cf_'+cf.id]=cur; }
+    }, isSingle);
+    editFormValues['cf_'+cf.id]=cur;
     cfWrap.appendChild(fd);
   });
 }
+
+window.inlineAddCustomOption=function(cfId){
+  const cf=CUSTOM_FIELDS.find(f=>f.id===cfId); if(!cf) return;
+  const val=prompt(`New option for "${cf.name}":`); if(!val?.trim()) return;
+  const v=val.trim();
+  if(!cf.options) cf.options=[];
+  if(!cf.options.includes(v)) cf.options.push(v);
+  saveOptions(); buildFilterPanel();
+  buildModalChips(WORDS.find(x=>x.id===editingId)||{});
+  showToast(`"${v}" added to ${cf.name}`);
+};
 
 window.closeEditModal=function(){ document.getElementById('editModal').classList.remove('show'); };
 
@@ -1061,7 +1031,7 @@ window.saveSign=async function(){
     vid_example:document.getElementById('fVidExample').value.trim(),
     special:[...editFormSpecial],
   };
-  CUSTOM_FIELDS.forEach(cf=>{ data['cf_'+cf.id]=editFormValues['cf_'+cf.id]||(cf.type==='multiselect'?[]:''); });
+  CUSTOM_FIELDS.forEach(cf=>{ data['cf_'+cf.id]=editFormValues['cf_'+cf.id]||(cf.type==='singleselect'?'':[]); });
   if(editingId){ data.id=editingId; await saveWord(data); const idx=WORDS.findIndex(x=>x.id===editingId); if(idx!==-1) WORDS[idx]=data; showToast('Sign updated'); }
   else { data.id='sign_'+Date.now(); await saveWord(data); WORDS.push(data); showToast('Sign added'); }
   closeEditModal();
@@ -1081,76 +1051,147 @@ window.confirmDelete=async function(){
 
 /* ══ OPTIONS ══ */
 window.switchAdminTab=function(tab){
-  ['signs','options','fields','handshapes','feedback'].forEach(t=>{
+  ['signs','options','handshapes','feedback'].forEach(t=>{
     const k=t.charAt(0).toUpperCase()+t.slice(1);
     document.getElementById('at'+k)?.classList.toggle('active',t===tab);
     document.getElementById('ap'+k)?.classList.toggle('active',t===tab);
   });
   document.getElementById('addSignBtn').style.display=tab==='signs'?'':'none';
   if(tab==='options')    renderOptionsPanel();
-  if(tab==='fields')     renderCustomFieldsPanel();
   if(tab==='handshapes') renderHsMgGrid();
   if(tab==='feedback')   renderFeedbackAdmin();
 };
 
+/* ══ UNIFIED CATEGORY SYSTEM ══
+   Built-in blocks: cat, topic, diff, tag (always present)
+   Custom blocks: stored in CUSTOM_FIELDS, same card UI, multi or single select
+*/
 function renderOptionsPanel(){
-  renderOptionList('catList',   CATEGORIES,   'cat');
-  renderOptionList('topicList', TOPICS,       'topic');
-  renderOptionList('diffList',  DIFFICULTIES, 'diff');
-  renderTagList();
+  const wrap=document.getElementById('optionsCardsWrap'); wrap.innerHTML='';
+
+  wrap.appendChild(makeOptionCard('Categories','cat',CATEGORIES,'multiselect','Multi-select on each sign.',false));
+  wrap.appendChild(makeOptionCard('Topics / Subjects','topic',TOPICS,'multiselect','Multi-select on each sign.',false));
+  wrap.appendChild(makeOptionCard('Difficulty Levels','diff',DIFFICULTIES,'singleselect','Single-select on each sign.',false));
+  wrap.appendChild(makeOptionCard('Special Tags','tag',SPECIAL_TAGS,'multiselect','Multi-select tags for filtering. Deleting a tag removes it from all signs.',false,true));
+
+  CUSTOM_FIELDS.forEach(cf=>{
+    if(!cf.options) cf.options=[];
+    const card=makeOptionCard(cf.name,'cf_'+cf.id,cf.options,cf.type,(cf.type==='singleselect'?'Single-select':'Multi-select')+' — custom category.',true);
+    wrap.appendChild(card);
+  });
 }
 
-function renderOptionList(elId,arr,type){
-  const el=document.getElementById(elId); el.innerHTML='';
+function makeOptionCard(title,key,arr,type,subtitle,isCustom,wide=false){
+  const card=document.createElement('div');
+  card.className='options-card'+(wide?'':'');
+  if(wide) card.style.gridColumn='1/-1';
+  const listId='optList_'+key;
+  const inputId='optNew_'+key;
+  card.innerHTML=`
+    <div class="cf-card-header" style="margin-bottom:4px;">
+      <div class="options-card-title">${title} <span style="font-size:10px;color:var(--text3);font-weight:400;">${type==='singleselect'?'(single-select)':'(multi-select)'}</span></div>
+      ${isCustom?`<button class="row-btn del" onclick="deleteCustomCategory('${key}')" title="Delete this whole category"><i class="ti ti-trash"></i></button>`:''}
+    </div>
+    <div class="options-card-sub">${subtitle}</div>
+    <div class="options-list" id="${listId}" ${wide?'style="flex-direction:row;flex-wrap:wrap;max-height:none;"':''}></div>
+    <div class="options-add-row"><input type="text" id="${inputId}" placeholder="New value..." onkeydown="if(event.key==='Enter')addCategoryValue('${key}')"/><button onclick="addCategoryValue('${key}')">Add</button></div>
+  `;
+  renderCategoryValueList(listId,arr,key,wide);
+  return card;
+}
+
+function renderCategoryValueList(listId,arr,key,wide){
+  const el=document.getElementById(listId); if(!el) return;
+  el.innerHTML='';
   arr.forEach((val,i)=>{
-    const row=document.createElement('div'); row.className='option-row';
-    row.innerHTML=`<input type="text" value="${val}" onchange="renameOption('${type}',${i},this.value)"/>
-      <button class="option-row-del" onclick="deleteOption('${type}',${i})"><i class="ti ti-x"></i></button>`;
-    el.appendChild(row);
-  });
-}
-
-function renderTagList(){
-  const el=document.getElementById('tagList'); el.innerHTML='';
-  SPECIAL_TAGS.forEach((tag,i)=>{
     const row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;gap:4px;background:var(--bg2);border:0.5px solid var(--border);border-radius:20px;padding:3px 4px 3px 10px;';
-    row.innerHTML=`<span style="font-size:12px;">${tag}</span><button class="option-row-del" onclick="deleteOption('tag',${i})" style="width:20px;height:20px;border-radius:50%;"><i class="ti ti-x" style="font-size:11px;"></i></button>`;
+    if(wide){
+      row.style.cssText='display:flex;align-items:center;gap:4px;background:var(--bg2);border:0.5px solid var(--border);border-radius:20px;padding:3px 4px 3px 10px;';
+      row.innerHTML=`<span style="font-size:12px;">${val}</span><button class="option-row-del" onclick="deleteCategoryValue('${key}',${i})" style="width:20px;height:20px;border-radius:50%;"><i class="ti ti-x" style="font-size:11px;"></i></button>`;
+    } else {
+      row.className='option-row';
+      row.innerHTML=`<input type="text" value="${val}" onchange="renameCategoryValue('${key}',${i},this.value)"/>
+        <button class="option-row-del" onclick="deleteCategoryValue('${key}',${i})"><i class="ti ti-x"></i></button>`;
+    }
     el.appendChild(row);
   });
 }
 
-window.renameOption=async function(type,i,newVal){
+// Get the live array reference for a given key (built-in or custom)
+function getCategoryArray(key){
+  if(key==='cat')   return CATEGORIES;
+  if(key==='topic') return TOPICS;
+  if(key==='diff')  return DIFFICULTIES;
+  if(key==='tag')   return SPECIAL_TAGS;
+  if(key.startsWith('cf_')){ const cf=CUSTOM_FIELDS.find(f=>'cf_'+f.id===key); return cf?cf.options:null; }
+  return null;
+}
+
+// Get the field used on a sign object for this key (cat→w.cat, cf_xxx→w.cf_xxx)
+function fieldKeyOnSign(key){ return key==='tag' ? 'special' : key; }
+
+window.addCategoryValue=async function(key){
+  const inputId='optNew_'+key;
+  const val=document.getElementById(inputId).value.trim(); if(!val) return;
+  const arr=getCategoryArray(key); if(!arr) return;
+  if(!arr.includes(val)) arr.push(val);
+  document.getElementById(inputId).value='';
+  await saveOptions();
+  buildFilterPanel(); buildFilterTags(); renderOptionsPanel();
+  showToast(`"${val}" added`);
+};
+
+window.renameCategoryValue=async function(key,i,newVal){
   newVal=newVal.trim(); if(!newVal) return;
-  const oldVal=type==='cat'?CATEGORIES[i]:type==='topic'?TOPICS[i]:DIFFICULTIES[i];
-  if(type==='cat')   { CATEGORIES[i]=newVal;   WORDS.forEach(w=>{if(Array.isArray(w.cat)) w.cat=w.cat.map(x=>x===oldVal?newVal:x); else if(w.cat===oldVal) w.cat=newVal;}); }
-  if(type==='topic') { TOPICS[i]=newVal;        WORDS.forEach(w=>{if(Array.isArray(w.topic)) w.topic=w.topic.map(x=>x===oldVal?newVal:x); else if(w.topic===oldVal) w.topic=newVal;}); }
-  if(type==='diff')  { DIFFICULTIES[i]=newVal;  WORDS.forEach(w=>{if(w.diff===oldVal) w.diff=newVal;}); }
+  const arr=getCategoryArray(key); if(!arr) return;
+  const oldVal=arr[i]; arr[i]=newVal;
+  const field=fieldKeyOnSign(key);
+  WORDS.forEach(w=>{
+    const v=w[field];
+    if(Array.isArray(v)) w[field]=v.map(x=>x===oldVal?newVal:x);
+    else if(v===oldVal) w[field]=newVal;
+  });
   await saveOptions(); buildFilterPanel(); doFilter(); showToast('Renamed');
 };
 
-window.deleteOption=async function(type,i){
-  if(type==='cat')   CATEGORIES.splice(i,1);
-  if(type==='topic') TOPICS.splice(i,1);
-  if(type==='diff')  DIFFICULTIES.splice(i,1);
-  if(type==='tag')   { const r=SPECIAL_TAGS.splice(i,1)[0]; WORDS.forEach(w=>{w.special=(w.special||[]).filter(s=>s!==r);}); buildFilterTags(); }
+window.deleteCategoryValue=async function(key,i){
+  const arr=getCategoryArray(key); if(!arr) return;
+  const removed=arr.splice(i,1)[0];
+  const field=fieldKeyOnSign(key);
+  WORDS.forEach(w=>{
+    const v=w[field];
+    if(Array.isArray(v)) w[field]=v.filter(x=>x!==removed);
+    else if(v===removed) w[field]='';
+  });
+  if(key==='tag') buildFilterTags();
   await saveOptions(); buildFilterPanel(); doFilter(); renderOptionsPanel(); showToast('Deleted');
 };
 
-window.addOption=async function(type){
-  const ids={cat:'newCatInput',topic:'newTopicInput',diff:'newDiffInput',tag:'newTagInput'};
-  const val=document.getElementById(ids[type]).value.trim(); if(!val) return;
-  if(type==='cat'  &&!CATEGORIES.includes(val))  CATEGORIES.push(val);
-  if(type==='topic'&&!TOPICS.includes(val))       TOPICS.push(val);
-  if(type==='diff' &&!DIFFICULTIES.includes(val)) DIFFICULTIES.push(val);
-  if(type==='tag'  &&!SPECIAL_TAGS.includes(val)) SPECIAL_TAGS.push(val);
-  document.getElementById(ids[type]).value='';
-  await saveOptions(); buildFilterPanel(); buildFilterTags(); renderOptionsPanel(); showToast(`"${val}" added`);
+window.addNewCategoryBlock=async function(){
+  const name=document.getElementById('newFieldName').value.trim();
+  const type=document.getElementById('newFieldType').value;
+  if(!name){ showToast('Please enter a category name.'); return; }
+  if(CUSTOM_FIELDS.find(f=>f.name===name)){ showToast('A category with that name already exists.'); return; }
+  CUSTOM_FIELDS.push({id:'cf_'+Date.now(), name, type, options:[]});
+  document.getElementById('newFieldName').value='';
+  await saveOptions();
+  buildFilterPanel(); renderOptionsPanel();
+  showToast(`Category "${name}" created`);
+};
+
+window.deleteCustomCategory=async function(key){
+  const cf=CUSTOM_FIELDS.find(f=>'cf_'+f.id===key); if(!cf) return;
+  if(!confirm(`Delete category "${cf.name}"? This removes it from all signs.`)) return;
+  CUSTOM_FIELDS=CUSTOM_FIELDS.filter(f=>f!==cf);
+  WORDS.forEach(w=>{ delete w[key]; });
+  await saveOptions();
+  buildFilterPanel(); renderOptionsPanel();
+  showToast('Category deleted');
 };
 
 window.inlineAddOption=function(type){
   const labels={cat:'category',topic:'topic',diff:'difficulty',tag:'tag',hand:'handshape'};
-  const val=prompt(`New ${labels[type]}:`); if(!val?.trim()) return;
+  const val=prompt(`New ${labels[type]||type}:`); if(!val?.trim()) return;
   const v=val.trim();
   if(type==='cat'  &&!CATEGORIES.includes(v))  CATEGORIES.push(v);
   if(type==='topic'&&!TOPICS.includes(v))       TOPICS.push(v);
@@ -1159,80 +1200,6 @@ window.inlineAddOption=function(type){
   if(type==='hand' &&!HANDSHAPES.includes(v))   HANDSHAPES.push(v);
   saveOptions(); buildFilterPanel(); buildFilterTags(); buildModalChips(WORDS.find(x=>x.id===editingId)||{});
   showToast(`"${v}" added`);
-};
-
-/* ══ CUSTOM FIELDS ══ */
-function renderCustomFieldsPanel(){
-  const el=document.getElementById('cfList'); el.innerHTML='';
-  CUSTOM_FIELDS.forEach((cf,i)=>{
-    const card=document.createElement('div'); card.className='cf-card';
-    card.innerHTML=`
-      <div class="cf-card-header">
-        <span class="cf-card-title">${cf.name} <span style="font-size:11px;color:var(--text3);font-weight:400;">(${cf.type})</span></span>
-        <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="deleteCustomField(${i})"><i class="ti ti-trash"></i> Delete field</button>
-      </div>
-      ${cf.type!=='text'?`
-      <p style="font-size:12px;color:var(--text2);margin-bottom:8px;">Options:</p>
-      <div class="options-list" id="cfOpts_${cf.id}" style="max-height:150px;"></div>
-      <div class="options-add-row">
-        <input type="text" id="cfOptNew_${cf.id}" placeholder="New option..."/>
-        <button onclick="addCfOption('${cf.id}')">Add</button>
-      </div>`:'<p style="font-size:12px;color:var(--text3);">Free text — no options needed.</p>'}`;
-    el.appendChild(card);
-    if(cf.type!=='text') renderCfOptions(cf);
-  });
-  if(!CUSTOM_FIELDS.length) el.innerHTML='<p style="color:var(--text3);font-size:13px;">No custom fields yet. Add one above.</p>';
-}
-
-function renderCfOptions(cf){
-  const el=document.getElementById('cfOpts_'+cf.id); if(!el) return;
-  el.innerHTML='';
-  (cf.options||[]).forEach((opt,j)=>{
-    const row=document.createElement('div'); row.className='option-row';
-    row.innerHTML=`<input type="text" value="${opt}" onchange="renameCfOption('${cf.id}',${j},this.value)"/>
-      <button class="option-row-del" onclick="deleteCfOption('${cf.id}',${j})"><i class="ti ti-x"></i></button>`;
-    el.appendChild(row);
-  });
-}
-
-window.addCustomField=async function(){
-  const name=document.getElementById('cfNewName').value.trim();
-  const type=document.getElementById('cfNewType').value;
-  if(!name){ showToast('Please enter a field name.'); return; }
-  if(CUSTOM_FIELDS.find(f=>f.name===name)){ showToast('Field name already exists.'); return; }
-  CUSTOM_FIELDS.push({id:'cf_'+Date.now(), name, type, options:[]});
-  document.getElementById('cfNewName').value='';
-  await saveOptions(); renderCustomFieldsPanel(); showToast(`Field "${name}" added`);
-};
-
-window.deleteCustomField=async function(i){
-  if(!confirm(`Delete field "${CUSTOM_FIELDS[i].name}"? This removes it from all signs.`)) return;
-  const cfId=CUSTOM_FIELDS[i].id;
-  CUSTOM_FIELDS.splice(i,1);
-  WORDS.forEach(w=>{ delete w['cf_'+cfId]; });
-  await saveOptions(); renderCustomFieldsPanel(); showToast('Field deleted');
-};
-
-window.addCfOption=async function(cfId){
-  const cf=CUSTOM_FIELDS.find(f=>f.id===cfId); if(!cf) return;
-  const val=document.getElementById('cfOptNew_'+cfId)?.value.trim(); if(!val) return;
-  if(!cf.options) cf.options=[];
-  if(!cf.options.includes(val)) cf.options.push(val);
-  document.getElementById('cfOptNew_'+cfId).value='';
-  await saveOptions(); renderCfOptions(cf); showToast(`"${val}" added`);
-};
-
-window.renameCfOption=async function(cfId,j,newVal){
-  const cf=CUSTOM_FIELDS.find(f=>f.id===cfId); if(!cf) return;
-  const old=cf.options[j]; cf.options[j]=newVal.trim();
-  WORDS.forEach(w=>{ const v=w['cf_'+cfId]; if(Array.isArray(v)) w['cf_'+cfId]=v.map(x=>x===old?newVal:x); else if(v===old) w['cf_'+cfId]=newVal; });
-  await saveOptions(); showToast('Renamed');
-};
-
-window.deleteCfOption=async function(cfId,j){
-  const cf=CUSTOM_FIELDS.find(f=>f.id===cfId); if(!cf) return;
-  cf.options.splice(j,1);
-  await saveOptions(); renderCfOptions(cf); showToast('Option deleted');
 };
 
 /* ══ HANDSHAPE MANAGE ══ */
