@@ -556,7 +556,6 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopu
 /* ══════════════════════════════════════
    🔧 PASTE YOUR FIREBASE CONFIG HERE
 ══════════════════════════════════════ */
-
 const firebaseConfig = {
   apiKey: "AIzaSyDxfPYsdb-zPnI42wg77zYXH6PcSU-ABCw",
   authDomain: "signbiz-2.firebaseapp.com",
@@ -565,7 +564,6 @@ const firebaseConfig = {
   messagingSenderId: "871988085904",
   appId: "1:871988085904:web:130fac847a3c7fdd328415"
 };
-
 /* ══════════════════════════════════════ */
 
 const app  = initializeApp(firebaseConfig);
@@ -1023,4 +1021,293 @@ function buildModalChips(w) {
   const cfWrap=document.getElementById('fCustomFields'); cfWrap.innerHTML='';
   CUSTOM_FIELDS.forEach(cf=>{
     const fd=document.createElement('div'); fd.className='form-field';
-    const lbl=document.createE
+    const lbl=document.createElement('label'); lbl.textContent=cf.name; fd.appendChild(lbl);
+    if(cf.type==='text'){
+      const inp=document.createElement('input'); inp.type='text'; inp.value=w['cf_'+cf.id]||'';
+      inp.oninput=()=>{ editFormValues['cf_'+cf.id]=inp.value; };
+      fd.appendChild(inp);
+    } else {
+      const ms=document.createElement('div'); ms.className='ms-wrap'; ms.id='cfChips_'+cf.id;
+      fd.appendChild(ms);
+      const isSingle=cf.type==='singleselect';
+      let cur=w['cf_'+cf.id]||(isSingle?'':[]); if(!Array.isArray(cur)&&!isSingle) cur=cur?[cur]:[];
+      buildChips('cfChips_'+cf.id, cf.options||[], cur, (v,on)=>{
+        if(isSingle){ editFormValues['cf_'+cf.id]=v; document.querySelectorAll(`#cfChips_${cf.id} .ms-chip`).forEach(c=>c.classList.toggle('on',c.textContent===v)); }
+        else { if(on) cur.push(v); else cur=cur.filter(x=>x!==v); editFormValues['cf_'+cf.id]=cur; }
+      }, isSingle);
+      editFormValues['cf_'+cf.id]=cur;
+    }
+    cfWrap.appendChild(fd);
+  });
+}
+
+window.closeEditModal=function(){ document.getElementById('editModal').classList.remove('show'); };
+
+window.saveSign=async function(){
+  const en=document.getElementById('fEn').value.trim();
+  const cat=editFormValues.cat||[];
+  const hand=editFormValues.hand||[];
+  if(!en||!cat.length||!hand.length){ showToast('Please fill in name, at least one category, and one handshape.'); return; }
+  const data={
+    en, es:document.getElementById('fEs').value.trim(),
+    cat, topic:editFormValues.topic||[], hand, diff:editFormValues.diff||'',
+    desc:document.getElementById('fDesc').value.trim(),
+    vid_how:document.getElementById('fVidHow').value.trim(),
+    vid_concept:document.getElementById('fVidConcept').value.trim(),
+    vid_example:document.getElementById('fVidExample').value.trim(),
+    special:[...editFormSpecial],
+  };
+  CUSTOM_FIELDS.forEach(cf=>{ data['cf_'+cf.id]=editFormValues['cf_'+cf.id]||(cf.type==='multiselect'?[]:''); });
+  if(editingId){ data.id=editingId; await saveWord(data); const idx=WORDS.findIndex(x=>x.id===editingId); if(idx!==-1) WORDS[idx]=data; showToast('Sign updated'); }
+  else { data.id='sign_'+Date.now(); await saveWord(data); WORDS.push(data); showToast('Sign added'); }
+  closeEditModal();
+  buildFilterPanel(); buildHsGrid(); doFilter();
+  if(document.getElementById('pageAdmin').classList.contains('active')) renderAdminTable();
+};
+
+/* ══ DELETE ══ */
+window.openDeleteModal=function(id){ const w=WORDS.find(x=>x.id===id); if(!w) return; deletingId=id; document.getElementById('deleteSignName').textContent=`"${w.en}"`; document.getElementById('deleteModal').classList.add('show'); };
+window.closeDeleteModal=function(){ document.getElementById('deleteModal').classList.remove('show'); };
+window.confirmDelete=async function(){
+  await deleteWord(deletingId); WORDS=WORDS.filter(x=>x.id!==deletingId);
+  closeDeleteModal(); showToast('Sign deleted');
+  buildFilterPanel(); buildHsGrid(); doFilter(); renderAdminTable();
+  if(activeWord===deletingId){ activeWord=null; document.getElementById('rightPanel').innerHTML='<div class="empty-state"><i class="ti ti-hand-finger"></i><p>Select a sign from the list.</p></div>'; }
+};
+
+/* ══ OPTIONS ══ */
+window.switchAdminTab=function(tab){
+  ['signs','options','fields','handshapes','feedback'].forEach(t=>{
+    const k=t.charAt(0).toUpperCase()+t.slice(1);
+    document.getElementById('at'+k)?.classList.toggle('active',t===tab);
+    document.getElementById('ap'+k)?.classList.toggle('active',t===tab);
+  });
+  document.getElementById('addSignBtn').style.display=tab==='signs'?'':'none';
+  if(tab==='options')    renderOptionsPanel();
+  if(tab==='fields')     renderCustomFieldsPanel();
+  if(tab==='handshapes') renderHsMgGrid();
+  if(tab==='feedback')   renderFeedbackAdmin();
+};
+
+function renderOptionsPanel(){
+  renderOptionList('catList',   CATEGORIES,   'cat');
+  renderOptionList('topicList', TOPICS,       'topic');
+  renderOptionList('diffList',  DIFFICULTIES, 'diff');
+  renderTagList();
+}
+
+function renderOptionList(elId,arr,type){
+  const el=document.getElementById(elId); el.innerHTML='';
+  arr.forEach((val,i)=>{
+    const row=document.createElement('div'); row.className='option-row';
+    row.innerHTML=`<input type="text" value="${val}" onchange="renameOption('${type}',${i},this.value)"/>
+      <button class="option-row-del" onclick="deleteOption('${type}',${i})"><i class="ti ti-x"></i></button>`;
+    el.appendChild(row);
+  });
+}
+
+function renderTagList(){
+  const el=document.getElementById('tagList'); el.innerHTML='';
+  SPECIAL_TAGS.forEach((tag,i)=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:4px;background:var(--bg2);border:0.5px solid var(--border);border-radius:20px;padding:3px 4px 3px 10px;';
+    row.innerHTML=`<span style="font-size:12px;">${tag}</span><button class="option-row-del" onclick="deleteOption('tag',${i})" style="width:20px;height:20px;border-radius:50%;"><i class="ti ti-x" style="font-size:11px;"></i></button>`;
+    el.appendChild(row);
+  });
+}
+
+window.renameOption=async function(type,i,newVal){
+  newVal=newVal.trim(); if(!newVal) return;
+  const oldVal=type==='cat'?CATEGORIES[i]:type==='topic'?TOPICS[i]:DIFFICULTIES[i];
+  if(type==='cat')   { CATEGORIES[i]=newVal;   WORDS.forEach(w=>{if(Array.isArray(w.cat)) w.cat=w.cat.map(x=>x===oldVal?newVal:x); else if(w.cat===oldVal) w.cat=newVal;}); }
+  if(type==='topic') { TOPICS[i]=newVal;        WORDS.forEach(w=>{if(Array.isArray(w.topic)) w.topic=w.topic.map(x=>x===oldVal?newVal:x); else if(w.topic===oldVal) w.topic=newVal;}); }
+  if(type==='diff')  { DIFFICULTIES[i]=newVal;  WORDS.forEach(w=>{if(w.diff===oldVal) w.diff=newVal;}); }
+  await saveOptions(); buildFilterPanel(); doFilter(); showToast('Renamed');
+};
+
+window.deleteOption=async function(type,i){
+  if(type==='cat')   CATEGORIES.splice(i,1);
+  if(type==='topic') TOPICS.splice(i,1);
+  if(type==='diff')  DIFFICULTIES.splice(i,1);
+  if(type==='tag')   { const r=SPECIAL_TAGS.splice(i,1)[0]; WORDS.forEach(w=>{w.special=(w.special||[]).filter(s=>s!==r);}); buildFilterTags(); }
+  await saveOptions(); buildFilterPanel(); doFilter(); renderOptionsPanel(); showToast('Deleted');
+};
+
+window.addOption=async function(type){
+  const ids={cat:'newCatInput',topic:'newTopicInput',diff:'newDiffInput',tag:'newTagInput'};
+  const val=document.getElementById(ids[type]).value.trim(); if(!val) return;
+  if(type==='cat'  &&!CATEGORIES.includes(val))  CATEGORIES.push(val);
+  if(type==='topic'&&!TOPICS.includes(val))       TOPICS.push(val);
+  if(type==='diff' &&!DIFFICULTIES.includes(val)) DIFFICULTIES.push(val);
+  if(type==='tag'  &&!SPECIAL_TAGS.includes(val)) SPECIAL_TAGS.push(val);
+  document.getElementById(ids[type]).value='';
+  await saveOptions(); buildFilterPanel(); buildFilterTags(); renderOptionsPanel(); showToast(`"${val}" added`);
+};
+
+window.inlineAddOption=function(type){
+  const labels={cat:'category',topic:'topic',diff:'difficulty',tag:'tag',hand:'handshape'};
+  const val=prompt(`New ${labels[type]}:`); if(!val?.trim()) return;
+  const v=val.trim();
+  if(type==='cat'  &&!CATEGORIES.includes(v))  CATEGORIES.push(v);
+  if(type==='topic'&&!TOPICS.includes(v))       TOPICS.push(v);
+  if(type==='diff' &&!DIFFICULTIES.includes(v)) DIFFICULTIES.push(v);
+  if(type==='tag'  &&!SPECIAL_TAGS.includes(v)) SPECIAL_TAGS.push(v);
+  if(type==='hand' &&!HANDSHAPES.includes(v))   HANDSHAPES.push(v);
+  saveOptions(); buildFilterPanel(); buildFilterTags(); buildModalChips(WORDS.find(x=>x.id===editingId)||{});
+  showToast(`"${v}" added`);
+};
+
+/* ══ CUSTOM FIELDS ══ */
+function renderCustomFieldsPanel(){
+  const el=document.getElementById('cfList'); el.innerHTML='';
+  CUSTOM_FIELDS.forEach((cf,i)=>{
+    const card=document.createElement('div'); card.className='cf-card';
+    card.innerHTML=`
+      <div class="cf-card-header">
+        <span class="cf-card-title">${cf.name} <span style="font-size:11px;color:var(--text3);font-weight:400;">(${cf.type})</span></span>
+        <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="deleteCustomField(${i})"><i class="ti ti-trash"></i> Delete field</button>
+      </div>
+      ${cf.type!=='text'?`
+      <p style="font-size:12px;color:var(--text2);margin-bottom:8px;">Options:</p>
+      <div class="options-list" id="cfOpts_${cf.id}" style="max-height:150px;"></div>
+      <div class="options-add-row">
+        <input type="text" id="cfOptNew_${cf.id}" placeholder="New option..."/>
+        <button onclick="addCfOption('${cf.id}')">Add</button>
+      </div>`:'<p style="font-size:12px;color:var(--text3);">Free text — no options needed.</p>'}`;
+    el.appendChild(card);
+    if(cf.type!=='text') renderCfOptions(cf);
+  });
+  if(!CUSTOM_FIELDS.length) el.innerHTML='<p style="color:var(--text3);font-size:13px;">No custom fields yet. Add one above.</p>';
+}
+
+function renderCfOptions(cf){
+  const el=document.getElementById('cfOpts_'+cf.id); if(!el) return;
+  el.innerHTML='';
+  (cf.options||[]).forEach((opt,j)=>{
+    const row=document.createElement('div'); row.className='option-row';
+    row.innerHTML=`<input type="text" value="${opt}" onchange="renameCfOption('${cf.id}',${j},this.value)"/>
+      <button class="option-row-del" onclick="deleteCfOption('${cf.id}',${j})"><i class="ti ti-x"></i></button>`;
+    el.appendChild(row);
+  });
+}
+
+window.addCustomField=async function(){
+  const name=document.getElementById('cfNewName').value.trim();
+  const type=document.getElementById('cfNewType').value;
+  if(!name){ showToast('Please enter a field name.'); return; }
+  if(CUSTOM_FIELDS.find(f=>f.name===name)){ showToast('Field name already exists.'); return; }
+  CUSTOM_FIELDS.push({id:'cf_'+Date.now(), name, type, options:[]});
+  document.getElementById('cfNewName').value='';
+  await saveOptions(); renderCustomFieldsPanel(); showToast(`Field "${name}" added`);
+};
+
+window.deleteCustomField=async function(i){
+  if(!confirm(`Delete field "${CUSTOM_FIELDS[i].name}"? This removes it from all signs.`)) return;
+  const cfId=CUSTOM_FIELDS[i].id;
+  CUSTOM_FIELDS.splice(i,1);
+  WORDS.forEach(w=>{ delete w['cf_'+cfId]; });
+  await saveOptions(); renderCustomFieldsPanel(); showToast('Field deleted');
+};
+
+window.addCfOption=async function(cfId){
+  const cf=CUSTOM_FIELDS.find(f=>f.id===cfId); if(!cf) return;
+  const val=document.getElementById('cfOptNew_'+cfId)?.value.trim(); if(!val) return;
+  if(!cf.options) cf.options=[];
+  if(!cf.options.includes(val)) cf.options.push(val);
+  document.getElementById('cfOptNew_'+cfId).value='';
+  await saveOptions(); renderCfOptions(cf); showToast(`"${val}" added`);
+};
+
+window.renameCfOption=async function(cfId,j,newVal){
+  const cf=CUSTOM_FIELDS.find(f=>f.id===cfId); if(!cf) return;
+  const old=cf.options[j]; cf.options[j]=newVal.trim();
+  WORDS.forEach(w=>{ const v=w['cf_'+cfId]; if(Array.isArray(v)) w['cf_'+cfId]=v.map(x=>x===old?newVal:x); else if(v===old) w['cf_'+cfId]=newVal; });
+  await saveOptions(); showToast('Renamed');
+};
+
+window.deleteCfOption=async function(cfId,j){
+  const cf=CUSTOM_FIELDS.find(f=>f.id===cfId); if(!cf) return;
+  cf.options.splice(j,1);
+  await saveOptions(); renderCfOptions(cf); showToast('Option deleted');
+};
+
+/* ══ HANDSHAPE MANAGE ══ */
+function renderHsMgGrid(){
+  const grid=document.getElementById('hsMgGrid'); grid.innerHTML='';
+  HANDSHAPES.forEach(l=>{
+    const cell=document.createElement('div'); cell.className='hs-manage-cell';
+    const preview=document.createElement('div'); preview.className='hs-manage-preview';
+    if(hsImageMap[l]){ const img=document.createElement('img'); img.src=hsImageMap[l]; img.alt=l; preview.appendChild(img); }
+    else { const sp=document.createElement('span'); sp.className='hs-manage-letter'; sp.textContent=l; preview.appendChild(sp); }
+    cell.appendChild(preview);
+    const lbl=document.createElement('div'); lbl.className='hs-manage-lbl'; lbl.textContent=l; cell.appendChild(lbl);
+    const ul=document.createElement('label'); ul.className='hs-manage-upload';
+    ul.innerHTML=`<i class="ti ti-upload" style="font-size:11px;margin-right:3px;"></i>${hsImageMap[l]?'Replace':'Upload'}`;
+    const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.style.display='none';
+    inp.onchange=async e=>{ const f=e.target.files[0]; if(!f) return; hsImageMap[l]=await fileToB64(f); await saveOptions(); buildHsGrid(); renderHsMgGrid(); showToast(`Handshape ${l} updated`); };
+    ul.appendChild(inp); cell.appendChild(ul);
+    if(hsImageMap[l]){ const db2=document.createElement('button'); db2.className='hs-manage-del'; db2.innerHTML='<i class="ti ti-trash" style="font-size:11px;margin-right:2px;"></i>Remove'; db2.onclick=async()=>{ delete hsImageMap[l]; await saveOptions(); buildHsGrid(); renderHsMgGrid(); showToast('Image removed'); }; cell.appendChild(db2); }
+    grid.appendChild(cell);
+  });
+}
+
+window.addHandshape=async function(){
+  const inp=document.getElementById('newHsInput');
+  const v=inp.value.trim().toUpperCase(); if(!v) return;
+  if(HANDSHAPES.includes(v)){ showToast(`"${v}" already exists`); return; }
+  HANDSHAPES.push(v); inp.value='';
+  await saveOptions(); buildHsGrid(); renderHsMgGrid(); buildFilterPanel(); showToast(`Handshape "${v}" added`);
+};
+
+/* ══ FEEDBACK ADMIN ══ */
+window.renderFeedbackAdmin=async function(){
+  await loadFeedback();
+  const typeF=document.getElementById('fbFilterType')?.value||'';
+  const starF=document.getElementById('fbFilterStars')?.value||'';
+  const list=FEEDBACKS.filter(f=>{
+    if(typeF&&f.type!==typeF) return false;
+    if(starF&&String(f.rating)!==starF) return false;
+    return true;
+  });
+  const el=document.getElementById('fbAdminList');
+  if(!list.length){ el.innerHTML='<p style="color:var(--text3);font-size:13px;">No feedback yet.</p>'; return; }
+  el.innerHTML=list.map(f=>{
+    const stars='★'.repeat(f.rating||0)+'☆'.repeat(5-(f.rating||0));
+    const date=f.ts?new Date(f.ts).toLocaleDateString():'';
+    return `<div class="fb-card">
+      <div class="fb-card-header">
+        <span class="fb-stars">${stars}</span>
+        <span class="fb-badge">${f.type||'Other'}</span>
+        ${f.signName?`<span class="fb-sign-ref">Re: ${f.signName}</span>`:'<span class="fb-sign-ref">General</span>'}
+        <button class="fb-del-btn" onclick="deleteFeedback('${f.id}')"><i class="ti ti-trash"></i></button>
+      </div>
+      ${f.text?`<p class="fb-card-text">${f.text}</p>`:''}
+      <p class="fb-card-meta">${date}</p>
+    </div>`;
+  }).join('');
+};
+
+window.deleteFeedback=async function(id){
+  await deleteDoc(doc(db,'feedback',id));
+  showToast('Feedback deleted');
+  renderFeedbackAdmin();
+};
+
+/* ══ TOAST ══ */
+let toastTimer;
+window.showToast=function(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2400); };
+
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeFsModal(); closeEditModal(); closeDeleteModal(); } });
+
+/* ══ INIT ══ */
+async function init(){
+  try{ await loadAll(); } catch(e){ console.error(e); showToast('⚠ Firebase connection error. Check your config.'); }
+  document.getElementById('appLoading').style.display='none';
+  document.getElementById('mainHeader').style.display='flex';
+  buildFilterPanel(); buildFilterTags(); buildHsGrid(); doFilter();
+  showPage('dict');
+}
+init();
+</script>
+</body>
+</html>
