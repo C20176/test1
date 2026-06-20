@@ -537,12 +537,12 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopu
    🔧 PASTE YOUR FIREBASE CONFIG HERE
 ══════════════════════════════════════ */
 const firebaseConfig = {
-  apiKey: "AIzaSyASMmfr_zFRJFzuquOTENogYZNSIyB1c7s",
-  authDomain: "biztest-d81e8.firebaseapp.com",
-  projectId: "biztest-d81e8",
-  storageBucket: "biztest-d81e8.firebasestorage.app",
-  messagingSenderId: "278584330390",
-  appId: "1:278584330390:web:ed266628f91b84c6fc9ab7"
+  apiKey: "AIzaSyDxfPYsdb-zPnI42wg77zYXH6PcSU-ABCw",
+  authDomain: "signbiz-2.firebaseapp.com",
+  projectId: "signbiz-2",
+  storageBucket: "signbiz-2.firebasestorage.app",
+  messagingSenderId: "871988085904",
+  appId: "1:871988085904:web:130fac847a3c7fdd328415"
 };
 /* ══════════════════════════════════════ */
 
@@ -608,11 +608,32 @@ async function loadAll() {
 
 async function saveOptions() {
   showSaving(true);
-  await setDoc(doc(db,'_meta','options'),{
-    categories:CATEGORIES, difficulties:DIFFICULTIES, topics:TOPICS,
-    tags:SPECIAL_TAGS, handshapes:HANDSHAPES, hsImages:hsImageMap, customFields:CUSTOM_FIELDS
-  });
+  try {
+    await setDoc(doc(db,'_meta','options'),{
+      categories:CATEGORIES, difficulties:DIFFICULTIES, topics:TOPICS,
+      tags:SPECIAL_TAGS, handshapes:HANDSHAPES, hsImages:hsImageMap, customFields:CUSTOM_FIELDS
+    });
+  } catch(err) {
+    console.error('saveOptions failed:', err);
+    showToast('⚠ Could not save. Check your connection and try again.');
+  }
   showSaving(false);
+}
+
+// Re-fetch the latest options from Firestore into memory (call before any edit
+// that touches CATEGORIES/TOPICS/etc, so we never overwrite teammates' changes)
+async function refreshOptions() {
+  const optSnap = await getDoc(doc(db,'_meta','options'));
+  if (optSnap.exists()) {
+    const d=optSnap.data();
+    CATEGORIES    = d.categories    || CATEGORIES;
+    DIFFICULTIES  = d.difficulties  || DIFFICULTIES;
+    TOPICS        = d.topics        || TOPICS;
+    SPECIAL_TAGS  = d.tags          || SPECIAL_TAGS;
+    HANDSHAPES    = d.handshapes    || HANDSHAPES;
+    hsImageMap    = d.hsImages      || hsImageMap;
+    CUSTOM_FIELDS = d.customFields  || CUSTOM_FIELDS;
+  }
 }
 
 async function saveWord(w) { showSaving(true); await setDoc(doc(db,'signs',String(w.id)),w); showSaving(false); }
@@ -1028,13 +1049,14 @@ function buildModalChips(w) {
   });
 }
 
-window.inlineAddCustomOption=function(cfId){
-  const cf=CUSTOM_FIELDS.find(f=>f.id===cfId); if(!cf) return;
-  const val=prompt(`New option for "${cf.name}":`); if(!val?.trim()) return;
+window.inlineAddCustomOption=async function(cfId){
+  const val=prompt(`New option:`); if(!val?.trim()) return;
   const v=val.trim();
+  await refreshOptions();
+  const cf=CUSTOM_FIELDS.find(f=>f.id===cfId); if(!cf) return;
   if(!cf.options) cf.options=[];
   if(!cf.options.includes(v)) cf.options.push(v);
-  saveOptions(); buildFilterPanel();
+  await saveOptions(); buildFilterPanel();
   buildModalChips(WORDS.find(x=>x.id===editingId)||{});
   showToast(`"${v}" added to ${cf.name}`);
 };
@@ -1158,6 +1180,7 @@ function fieldKeyOnSign(key){ return key==='tag' ? 'special' : key; }
 window.addCategoryValue=async function(key){
   const inputId='optNew_'+key;
   const val=document.getElementById(inputId).value.trim(); if(!val) return;
+  await refreshOptions();
   const arr=getCategoryArray(key); if(!arr) return;
   if(!arr.includes(val)) arr.push(val);
   document.getElementById(inputId).value='';
@@ -1197,6 +1220,7 @@ window.addNewCategoryBlock=async function(){
   const type=document.getElementById('newFieldType').value;
   const optsRaw=document.getElementById('newFieldOptions').value.trim();
   if(!name){ showToast('Please enter a category name.'); return; }
+  await refreshOptions();
   if(CUSTOM_FIELDS.find(f=>f.name===name)){ showToast('A category with that name already exists.'); return; }
   const options = optsRaw ? optsRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
   CUSTOM_FIELDS.push({id:'cf_'+Date.now(), name, type, options});
@@ -1217,16 +1241,17 @@ window.deleteCustomCategory=async function(key){
   showToast('Category deleted');
 };
 
-window.inlineAddOption=function(type){
+window.inlineAddOption=async function(type){
   const labels={cat:'category',topic:'topic',diff:'difficulty',tag:'tag',hand:'handshape'};
   const val=prompt(`New ${labels[type]||type}:`); if(!val?.trim()) return;
   const v=val.trim();
+  await refreshOptions();
   if(type==='cat'  &&!CATEGORIES.includes(v))  CATEGORIES.push(v);
   if(type==='topic'&&!TOPICS.includes(v))       TOPICS.push(v);
   if(type==='diff' &&!DIFFICULTIES.includes(v)) DIFFICULTIES.push(v);
   if(type==='tag'  &&!SPECIAL_TAGS.includes(v)) SPECIAL_TAGS.push(v);
   if(type==='hand' &&!HANDSHAPES.includes(v))   HANDSHAPES.push(v);
-  saveOptions(); buildFilterPanel(); buildFilterTags(); buildModalChips(WORDS.find(x=>x.id===editingId)||{});
+  await saveOptions(); buildFilterPanel(); buildFilterTags(); buildModalChips(WORDS.find(x=>x.id===editingId)||{});
   showToast(`"${v}" added`);
 };
 
