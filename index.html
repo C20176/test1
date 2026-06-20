@@ -442,7 +442,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     <p style="font-size:13px;color:var(--text2);margin-bottom:6px;">Are you sure you want to delete:</p>
     <p style="font-size:15px;font-weight:500;" id="deleteSignName"></p>
     <p style="font-size:12px;color:var(--text3);margin-top:4px;">This cannot be undone.</p>
-    <div class="form-footer"><button class="btn" onclick="closeDeleteModal()">Cancel</button><button class="btn btn-danger" onclick="confirmDelete()">Delete</button></div>
+    <div class="form-footer"><button class="btn" onclick="closeDeleteModal()">Cancel</button><button class="btn btn-danger" onclick="confirmDeleteRouter()">Delete</button></div>
   </div>
 </div>
 
@@ -470,7 +470,6 @@ const firebaseConfig = {
   messagingSenderId: "863898507687",
   appId: "1:863898507687:web:87ad1455ff4cd55234fe82"
 };
-
 
 /* ══════════════════════════════════════ */
 
@@ -913,7 +912,15 @@ function buildModalFields(w){
 
     const values=def.arr.map(x=>x.value);
     const isSingle=def.type==='singleselect';
-    let cur = isSingle ? (w[def.field]||'') : (Array.isArray(w[def.field])?[...w[def.field]]:(w[def.field]?[w[def.field]]:[]));
+    // Prefer the in-progress selection (editFormValues) if it already exists for this
+    // field — this preserves what the user picked even after we re-render the form
+    // (e.g. right after adding a new option via the + button).
+    let cur;
+    if(Object.prototype.hasOwnProperty.call(editFormValues, def.field)){
+      cur = isSingle ? editFormValues[def.field] : [...(editFormValues[def.field]||[])];
+    } else {
+      cur = isSingle ? (w[def.field]||'') : (Array.isArray(w[def.field])?[...w[def.field]]:(w[def.field]?[w[def.field]]:[]));
+    }
     buildChips('chips_'+def.key, values, cur, (v,on)=>{
       if(isSingle){ cur=v; editFormValues[def.field]=v; document.querySelectorAll(`#chips_${def.key} .ms-chip`).forEach(c=>c.classList.toggle('on',c.textContent===v)); }
       else { if(on) cur.push(v); else cur=cur.filter(x=>x!==v); editFormValues[def.field]=cur; }
@@ -923,11 +930,13 @@ function buildModalFields(w){
 
   // Handshape (always built-in, multi-select)
   const handValues=HANDSHAPES.map(h=>h.value);
-  let curHands=Array.isArray(w.hand)?[...w.hand]:(w.hand?[w.hand]:[]);
+  let curHands = Object.prototype.hasOwnProperty.call(editFormValues,'hand')
+    ? [...(editFormValues.hand||[])]
+    : (Array.isArray(w.hand)?[...w.hand]:(w.hand?[w.hand]:[]));
   buildChips('fHandChips', handValues, curHands, (v,on)=>{ if(on) curHands.push(v); else curHands=curHands.filter(x=>x!==v); editFormValues.hand=curHands; });
   editFormValues.hand=curHands;
 
-  // Special tags
+  // Special tags (editFormSpecial is already a persistent module-level array, so it survives re-renders)
   const tagValues=SPECIAL_TAGS.map(t=>t.value);
   buildChips('formTags', tagValues, editFormSpecial, (v,on)=>{ if(on) editFormSpecial.push(v); else editFormSpecial=editFormSpecial.filter(x=>x!==v); });
 }
@@ -958,8 +967,20 @@ window.saveSign=async function(){
 };
 
 /* ══ DELETE SIGN ══ */
-window.openDeleteModal=function(id){ const w=WORDS.find(x=>x.id===id); if(!w) return; deletingId=id; document.getElementById('deleteSignName').textContent=`"${w.en}"`; document.getElementById('deleteModal').classList.add('show'); };
+window.openDeleteModal=function(id){
+  const w=WORDS.find(x=>x.id===id); if(!w) return;
+  deletingId=id;
+  document.getElementById('deleteSignName').textContent=`"${w.en}"`;
+  document.querySelector('#deleteModal .modal-title span:first-child').textContent='Delete sign';
+  document.getElementById('deleteModal').dataset.mode='sign';
+  document.getElementById('deleteModal').classList.add('show');
+};
 window.closeDeleteModal=function(){ document.getElementById('deleteModal').classList.remove('show'); };
+window.confirmDeleteRouter=function(){
+  const mode=document.getElementById('deleteModal').dataset.mode;
+  if(mode==='handshape') confirmDeleteHandshape();
+  else confirmDelete();
+};
 window.confirmDelete=async function(){
   await deleteWordDoc(deletingId); WORDS=WORDS.filter(x=>x.id!==deletingId);
   closeDeleteModal(); showToast('Sign deleted');
@@ -1238,10 +1259,42 @@ function renderHsMgGrid(){
     const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.style.display='none';
     inp.onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const b64=await fileToB64(f); await updateValueDoc('handshapes',h.id,{image:b64}); h.image=b64; buildHsGrid(); renderHsMgGrid(); showToast(`Handshape ${h.value} updated`); };
     ul.appendChild(inp); cell.appendChild(ul);
-    if(h.image){ const db2=document.createElement('button'); db2.className='hs-manage-del'; db2.innerHTML='<i class="ti ti-trash" style="font-size:11px;margin-right:2px;"></i>Remove'; db2.onclick=async()=>{ await updateValueDoc('handshapes',h.id,{image:''}); delete h.image; buildHsGrid(); renderHsMgGrid(); showToast('Image removed'); }; cell.appendChild(db2); }
+    if(h.image){
+      const rmImg=document.createElement('button'); rmImg.className='hs-manage-del'; rmImg.innerHTML='<i class="ti ti-photo-off" style="font-size:11px;margin-right:2px;"></i>Remove image';
+      rmImg.onclick=async()=>{ await updateValueDoc('handshapes',h.id,{image:''}); delete h.image; buildHsGrid(); renderHsMgGrid(); showToast('Image removed'); };
+      cell.appendChild(rmImg);
+    }
+    const delHs=document.createElement('button'); delHs.className='hs-manage-del'; delHs.style.color='var(--danger)';
+    delHs.innerHTML='<i class="ti ti-trash" style="font-size:11px;margin-right:2px;"></i>Delete';
+    delHs.onclick=()=>openDeleteHandshapeConfirm(h.id,h.value);
+    cell.appendChild(delHs);
     grid.appendChild(cell);
   });
 }
+
+let pendingDeleteHsId=null;
+window.openDeleteHandshapeConfirm=function(id,value){
+  pendingDeleteHsId=id;
+  document.getElementById('deleteSignName').textContent=`Handshape "${value}"`;
+  document.querySelector('#deleteModal .modal-title span:first-child').textContent='Delete handshape';
+  document.getElementById('deleteModal').dataset.mode='handshape';
+  document.getElementById('deleteModal').classList.add('show');
+};
+
+window.confirmDeleteHandshape=async function(){
+  if(!pendingDeleteHsId) return;
+  const idx=HANDSHAPES.findIndex(h=>h.id===pendingDeleteHsId); if(idx===-1) return;
+  const removedVal=HANDSHAPES[idx].value;
+  await deleteValueDoc('handshapes',pendingDeleteHsId);
+  HANDSHAPES.splice(idx,1);
+  // Remove this handshape from any sign that used it
+  WORDS.forEach(w=>{ if(Array.isArray(w.hand)) w.hand=w.hand.filter(x=>x!==removedVal); });
+  if(activeAZ===removedVal) activeAZ=null;
+  pendingDeleteHsId=null;
+  closeDeleteModal();
+  buildHsGrid(); renderHsMgGrid(); buildFilterPanel(); doFilter();
+  showToast(`Handshape "${removedVal}" deleted`);
+};
 
 window.addHandshape=async function(){
   const inp=document.getElementById('newHsInput');
