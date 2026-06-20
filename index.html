@@ -7,33 +7,31 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
 <!--
 ╔══════════════════════════════════════════════════════════════════╗
-║  SIGNBIZ SETUP                                                   ║
+║  SIGNBIZ SETUP — fresh rebuild with per-document data model      ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║  1. Paste your Firebase config in the firebaseConfig block       ║
-║  2. Firestore Security Rules — paste this EXACT block in         ║
-║     Firebase Console → Firestore Database → Rules → Publish:     ║
+║  2. Firestore Security Rules — paste EXACTLY in Firebase         ║
+║     Console → Firestore Database → Rules → Publish:              ║
 ║                                                                    ║
-║     rules_version = '2';                                         ║
-║     service cloud.firestore {                                    ║
-║       match /databases/{database}/documents {                    ║
-║         match /signs/{id} {                                      ║
-║           allow read: if true;                                   ║
-║           allow write: if request.auth != null;                  ║
-║         }                                                        ║
-║         match /_meta/{id} {                                      ║
-║           allow read: if true;                                   ║
-║           allow write: if request.auth != null;                  ║
-║         }                                                        ║
-║         match /feedback/{id} {                                   ║
-║           allow create: if true;                                 ║
-║           allow read, update, delete: if request.auth != null;   ║
-║         }                                                        ║
-║       }                                                          ║
-║     }                                                            ║
+║   rules_version = '2';                                           ║
+║   service cloud.firestore {                                      ║
+║     match /databases/{database}/documents {                      ║
+║       match /signs/{id}            { allow read: if true; allow write: if request.auth != null; } ║
+║       match /categories/{id}       { allow read: if true; allow write: if request.auth != null; } ║
+║       match /topics/{id}           { allow read: if true; allow write: if request.auth != null; } ║
+║       match /difficulties/{id}     { allow read: if true; allow write: if request.auth != null; } ║
+║       match /tags/{id}             { allow read: if true; allow write: if request.auth != null; } ║
+║       match /handshapes/{id}       { allow read: if true; allow write: if request.auth != null; } ║
+║       match /customFields/{id}     { allow read: if true; allow write: if request.auth != null; } ║
+║       match /customFieldOptions/{id} { allow read: if true; allow write: if request.auth != null; } ║
+║       match /feedback/{id}         { allow create: if true; allow read, update, delete: if request.auth != null; } ║
+║     }                                                             ║
+║   }                                                               ║
 ║                                                                    ║
-║  IMPORTANT: feedback needs "allow create: if true" so visitors   ║
-║  who are NOT logged in can submit feedback. Without this rule,   ║
-║  the feedback form will silently fail for non-admin visitors.    ║
+║  WHY THIS STRUCTURE: every category value (e.g. "Greetings",     ║
+║  "Book") is its OWN Firestore document instead of one big array. ║
+║  This means adding/editing/deleting one value never overwrites   ║
+║  anyone else's changes — no more data loss from race conditions. ║
 ╚══════════════════════════════════════════════════════════════════╝
 -->
 <style>
@@ -52,15 +50,11 @@
 }
 body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;}
 .page{display:none;}.page.active{display:block;}
-
-/* LOADING */
 .app-loading{position:fixed;inset:0;background:var(--accent);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999;}
 .app-loading i{font-size:40px;color:white;}
 .app-loading p{font-size:14px;color:rgba(255,255,255,0.8);}
 .spinner{width:28px;height:28px;border:3px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-
-/* LOGIN */
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg3);}
 .login-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:32px;width:min(400px,92vw);}
 .login-logo{display:flex;align-items:center;gap:10px;margin-bottom:24px;}
@@ -69,19 +63,17 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .login-logo-sub{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;}
 .login-divider{display:flex;align-items:center;gap:10px;margin:16px 0;font-size:11px;color:var(--text3);}
 .login-divider::before,.login-divider::after{content:'';flex:1;height:0.5px;background:var(--border);}
-.google-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;border:0.5px solid var(--border2);border-radius:var(--r-md);background:var(--bg);font-size:13px;font-weight:500;cursor:pointer;transition:background 0.15s;}
+.google-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;border:0.5px solid var(--border2);border-radius:var(--r-md);background:var(--bg);font-size:13px;font-weight:500;cursor:pointer;}
 .google-btn:hover{background:var(--bg2);}
 .google-btn svg{width:18px;height:18px;}
 .login-error{font-size:12px;color:var(--danger);margin-top:8px;display:none;}
-
-/* HEADER */
 .header{background:var(--accent);padding:0 24px;display:flex;align-items:center;position:sticky;top:0;z-index:100;}
 .header-logo{display:flex;align-items:center;gap:10px;padding:14px 0;margin-right:32px;}
 .header-logo i{font-size:22px;color:rgba(255,255,255,0.9);}
 .header-logo-text{font-size:15px;font-weight:500;color:white;line-height:1.2;}
 .header-logo-sub{font-size:10px;color:rgba(255,255,255,0.6);letter-spacing:0.05em;text-transform:uppercase;}
 .header-nav{display:flex;align-items:stretch;flex:1;}
-.nav-item{padding:0 16px;display:flex;align-items:center;font-size:13px;color:rgba(255,255,255,0.75);cursor:pointer;border-bottom:3px solid transparent;transition:all 0.15s;white-space:nowrap;}
+.nav-item{padding:0 16px;display:flex;align-items:center;font-size:13px;color:rgba(255,255,255,0.75);cursor:pointer;border-bottom:3px solid transparent;}
 .nav-item:hover{color:white;background:rgba(255,255,255,0.08);}
 .nav-item.active{color:white;border-bottom-color:white;}
 .header-search{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.15);border-radius:var(--r-md);padding:0 12px;margin:10px 0 10px 16px;}
@@ -89,35 +81,30 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .header-search input{border:none;outline:none;background:transparent;font-size:13px;color:white;padding:7px 0;width:180px;}
 .header-search input::placeholder{color:rgba(255,255,255,0.5);}
 .lang-toggle{display:flex;align-items:center;gap:3px;background:rgba(255,255,255,0.12);border-radius:var(--r-md);padding:3px;margin-left:12px;}
-.lang-btn{font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:transparent;color:rgba(255,255,255,0.65);transition:all 0.15s;}
+.lang-btn{font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:transparent;color:rgba(255,255,255,0.65);}
 .lang-btn.active{background:white;color:var(--accent);}
 .header-right{display:flex;align-items:center;gap:8px;margin-left:16px;}
 .header-user{display:flex;align-items:center;gap:7px;font-size:12px;color:rgba(255,255,255,0.8);}
 .header-user img{width:26px;height:26px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.5);}
-.hdr-btn{display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:var(--r-md);font-size:12px;font-weight:500;cursor:pointer;border:0.5px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.12);color:white;transition:background 0.15s;white-space:nowrap;}
+.hdr-btn{display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:var(--r-md);font-size:12px;font-weight:500;cursor:pointer;border:0.5px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.12);color:white;}
 .hdr-btn:hover{background:rgba(255,255,255,0.22);}
-
-/* HANDSHAPE STRIP */
 .hs-strip{background:var(--accent);padding:0 0 16px;}
 .hs-grid{display:flex;flex-wrap:wrap;gap:3px;padding:0 24px;}
-.hs-cell{width:52px;height:52px;border:2px solid rgba(255,255,255,0.2);border-radius:4px;overflow:hidden;cursor:pointer;background:#0d2d5a;display:flex;align-items:center;justify-content:center;transition:all 0.15s;position:relative;flex-shrink:0;}
+.hs-cell{width:52px;height:52px;border:2px solid rgba(255,255,255,0.2);border-radius:4px;overflow:hidden;cursor:pointer;background:#0d2d5a;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;}
 .hs-cell:hover{border-color:rgba(255,255,255,0.7);}
 .hs-cell.active{border-color:white;box-shadow:0 0 0 2px white;}
-.hs-cell.no-data{opacity:0.35;cursor:default;}
 .hs-cell img{width:100%;height:100%;object-fit:cover;}
 .hs-cell .hs-letter{font-size:16px;font-weight:600;color:rgba(255,255,255,0.5);}
 .hs-cell.active .hs-letter{color:white;}
 .hs-cell .hs-badge{position:absolute;bottom:2px;right:3px;font-size:9px;font-weight:600;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.8);}
 .hs-all{padding:10px 24px 0;display:flex;gap:8px;align-items:center;}
-.hs-all-btn{font-size:12px;padding:4px 14px;border-radius:20px;border:0.5px solid rgba(255,255,255,0.4);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;transition:all 0.15s;}
+.hs-all-btn{font-size:12px;padding:4px 14px;border-radius:20px;border:0.5px solid rgba(255,255,255,0.4);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;}
 .hs-all-btn:hover,.hs-all-btn.active{background:white;color:var(--accent);}
 .hs-label{font-size:11px;color:rgba(255,255,255,0.5);margin-left:8px;}
-
-/* LAYOUT */
 .main-layout{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - 141px);}
 .left{background:var(--bg);border-right:0.5px solid var(--border);display:flex;flex-direction:column;}
 .left-top{padding:12px 14px;border-bottom:0.5px solid var(--border);}
-.adv-btn{display:flex;align-items:center;gap:5px;padding:6px 11px;border:0.5px solid var(--border2);border-radius:var(--r-md);font-size:12px;color:var(--text2);cursor:pointer;background:var(--bg2);margin-top:8px;transition:all 0.15s;width:100%;justify-content:center;}
+.adv-btn{display:flex;align-items:center;gap:5px;padding:6px 11px;border:0.5px solid var(--border2);border-radius:var(--r-md);font-size:12px;color:var(--text2);cursor:pointer;background:var(--bg2);margin-top:8px;width:100%;justify-content:center;}
 .adv-btn:hover,.adv-btn.open{background:var(--accent-light);color:var(--accent);border-color:var(--accent);}
 .adv-panel{display:none;padding:12px 14px;border-bottom:0.5px solid var(--border);background:var(--bg2);}
 .adv-panel.show{display:block;}
@@ -126,29 +113,23 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .adv-field select{width:100%;font-size:12px;padding:6px 8px;border-radius:var(--r-sm);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);outline:none;cursor:pointer;}
 .adv-section-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin:10px 0 5px;}
 .adv-tags{display:flex;gap:4px;flex-wrap:wrap;}
-.adv-tag{font-size:11px;padding:3px 8px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer;transition:all 0.12s;user-select:none;}
+.adv-tag{font-size:11px;padding:3px 8px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer;user-select:none;}
 .adv-tag.on{background:var(--accent);color:white;border-color:var(--accent);}
 .adv-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border);}
 .adv-actions button{font-size:12px;padding:5px 12px;border-radius:var(--r-sm);border:0.5px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;}
 .adv-actions .apply{background:var(--accent);color:white;border-color:var(--accent);}
 .result-count{font-size:11px;color:var(--text3);padding:8px 14px 4px;}
 .word-list{flex:1;overflow-y:auto;}
-.word-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:0.5px solid var(--border);cursor:pointer;transition:background 0.1s;}
+.word-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:0.5px solid var(--border);cursor:pointer;}
 .word-row:hover{background:var(--bg2);}
 .word-row.active{background:var(--accent-light);}
 .word-en{font-size:13px;font-weight:500;color:var(--text);flex:1;}
 .word-sub{font-size:11px;color:var(--text3);}
 .pill{font-size:10px;padding:2px 7px;border-radius:20px;white-space:nowrap;flex-shrink:0;}
 .no-results{padding:24px;text-align:center;color:var(--text3);font-size:13px;}
-
-/* MULTISELECT CHIPS */
 .ms-wrap{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
-.ms-chip{font-size:11px;padding:4px 10px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;user-select:none;transition:all 0.12s;}
+.ms-chip{font-size:11px;padding:4px 10px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;user-select:none;}
 .ms-chip.on{background:var(--accent);color:white;border-color:var(--accent);}
-.ms-chip-sm{font-size:11px;padding:3px 8px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;user-select:none;transition:all 0.12s;}
-.ms-chip-sm.on{background:var(--accent-light);color:var(--accent);border-color:var(--accent);}
-
-/* DETAIL */
 .right{padding:24px;overflow-y:auto;background:var(--bg3);}
 .detail-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:22px 24px;max-width:660px;}
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:360px;color:var(--text3);gap:10px;}
@@ -158,7 +139,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .entry-es{font-size:15px;color:var(--text2);margin-bottom:12px;font-style:italic;}
 .entry-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;}
 .vid-tabs{display:flex;gap:6px;margin-bottom:10px;}
-.vid-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 8px;border-radius:var(--r-md);font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);transition:all 0.15s;}
+.vid-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 8px;border-radius:var(--r-md);font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);}
 .vid-tab.active[data-type="how"]{background:var(--vhow-light);border-color:var(--vhow);color:var(--vhow);}
 .vid-tab.active[data-type="concept"]{background:var(--vconcept-light);border-color:var(--vconcept);color:var(--vconcept);}
 .vid-tab.active[data-type="example"]{background:var(--vexample-light);border-color:var(--vexample);color:var(--vexample);}
@@ -169,28 +150,24 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .vid-ph p{font-size:12px;color:var(--text3);}
 .entry-desc{font-size:13px;color:var(--text2);line-height:1.65;padding-top:14px;border-top:0.5px solid var(--border);}
 .entry-desc strong{color:var(--text);font-weight:500;}
-
-/* FEEDBACK WIDGET */
 .feedback-wrap{margin-top:16px;padding-top:14px;border-top:0.5px solid var(--border);}
 .feedback-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
 .star-row{display:flex;gap:4px;margin-bottom:10px;}
-.star{font-size:22px;cursor:pointer;color:var(--border2);transition:color 0.1s;user-select:none;}
+.star{font-size:22px;cursor:pointer;color:var(--border2);user-select:none;}
 .star.on,.star:hover{color:#F59E0B;}
 .fb-type-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
-.fb-type{font-size:11px;padding:4px 10px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;transition:all 0.12s;}
+.fb-type{font-size:11px;padding:4px 10px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;}
 .fb-type.on{background:var(--accent);color:white;border-color:var(--accent);}
 .fb-textarea{width:100%;font-size:12px;padding:8px 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);outline:none;resize:vertical;min-height:60px;margin-bottom:8px;}
 .fb-textarea:focus{border-color:var(--accent);background:var(--bg);}
-.fb-submit{font-size:12px;padding:6px 16px;border-radius:var(--r-md);border:0.5px solid var(--accent);background:var(--accent);color:white;cursor:pointer;transition:background 0.15s;}
+.fb-submit{font-size:12px;padding:6px 16px;border-radius:var(--r-md);border:0.5px solid var(--accent);background:var(--accent);color:white;cursor:pointer;}
 .fb-submit:hover{background:var(--accent2);}
 .fb-success{font-size:12px;color:var(--success);display:none;align-items:center;gap:5px;}
-
-/* ADMIN */
 .admin-header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;}
 .admin-title{font-size:18px;font-weight:500;}
 .admin-sub{font-size:12px;color:var(--text2);margin-top:2px;}
 .admin-tabs{display:flex;border-bottom:0.5px solid var(--border);background:var(--bg);padding:0 24px;}
-.admin-tab{padding:10px 18px;font-size:13px;color:var(--text2);cursor:pointer;border-bottom:2.5px solid transparent;transition:all 0.15s;white-space:nowrap;}
+.admin-tab{padding:10px 18px;font-size:13px;color:var(--text2);cursor:pointer;border-bottom:2.5px solid transparent;}
 .admin-tab:hover{color:var(--text);}
 .admin-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500;}
 .admin-tab-panel{display:none;}
@@ -202,7 +179,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .admin-table tr:last-child td{border-bottom:none;}
 .admin-table tr:hover td{background:var(--bg2);}
 .row-actions{display:flex;gap:6px;}
-.row-btn{display:flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:var(--r-sm);border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;transition:all 0.12s;}
+.row-btn{display:flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:var(--r-sm);border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;}
 .row-btn:hover{background:var(--bg2);color:var(--text);}
 .row-btn.del:hover{background:var(--danger-light);color:var(--danger);border-color:var(--danger);}
 .vdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block;}
@@ -210,11 +187,9 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .vdot.off{background:var(--border2);}
 .saving{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px;}
 .saving .spinner{width:12px;height:12px;border-width:2px;}
-
-/* OPTIONS */
 .options-wrap{padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:20px;}
 .options-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:18px 20px;}
-.options-card-title{font-size:14px;font-weight:500;margin-bottom:4px;}
+.options-card-title{font-size:14px;font-weight:500;}
 .options-card-sub{font-size:11px;color:var(--text3);margin-bottom:14px;}
 .options-list{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;max-height:200px;overflow-y:auto;}
 .option-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border:0.5px solid var(--border);border-radius:var(--r-md);background:var(--bg2);}
@@ -226,16 +201,8 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .options-add-row input:focus{border-color:var(--accent);background:var(--bg);}
 .options-add-row button{font-size:12px;padding:7px 14px;border-radius:var(--r-md);border:none;background:var(--accent);color:white;cursor:pointer;}
 .options-note{font-size:11px;color:var(--text3);margin-top:8px;}
-
-/* CUSTOM FIELDS */
-.cf-wrap{padding:20px 24px;}
-.cf-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:18px 20px;margin-bottom:16px;}
-.cf-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.cf-card-title{font-size:14px;font-weight:500;}
-.cf-new-row{display:flex;gap:8px;align-items:flex-end;background:var(--bg2);border-radius:var(--r-md);padding:14px;margin-bottom:16px;}
+.cf-new-row{display:flex;gap:8px;align-items:flex-end;background:var(--bg2);border-radius:var(--r-md);padding:14px;margin-bottom:16px;flex-wrap:wrap;}
 .cf-new-row .form-field{margin-bottom:0;flex:1;}
-
-/* HANDSHAPE MANAGE */
 .hs-manage-wrap{padding:20px 24px;}
 .hs-manage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:10px;}
 .hs-manage-cell{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-md);padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;}
@@ -243,12 +210,10 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .hs-manage-preview img{width:100%;height:100%;object-fit:cover;}
 .hs-manage-letter{font-size:22px;font-weight:600;color:var(--text3);}
 .hs-manage-lbl{font-size:11px;font-weight:600;color:var(--text2);}
-.hs-manage-upload{font-size:10px;padding:3px 8px;border-radius:20px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;transition:all 0.12s;}
+.hs-manage-upload{font-size:10px;padding:3px 8px;border-radius:20px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;}
 .hs-manage-upload:hover{background:var(--accent-light);color:var(--accent);border-color:var(--accent);}
 .hs-manage-del{font-size:10px;padding:3px 8px;border-radius:20px;border:none;background:transparent;color:var(--text3);cursor:pointer;}
 .hs-manage-del:hover{background:var(--danger-light);color:var(--danger);}
-
-/* FEEDBACK ADMIN */
 .fb-admin-wrap{padding:20px 24px;}
 .fb-admin-filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
 .fb-admin-filters select{font-size:12px;padding:6px 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);outline:none;cursor:pointer;}
@@ -261,8 +226,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .fb-card-meta{font-size:11px;color:var(--text3);margin-top:6px;}
 .fb-del-btn{margin-left:auto;font-size:11px;padding:3px 8px;border-radius:var(--r-sm);border:0.5px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;}
 .fb-del-btn:hover{background:var(--danger-light);color:var(--danger);border-color:var(--danger);}
-
-/* MODAL */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
 .modal-overlay.show{display:flex;}
 .modal-box{background:var(--bg);border-radius:var(--r-lg);padding:22px;width:min(560px,92vw);max-height:90vh;overflow-y:auto;}
@@ -272,16 +235,14 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .modal-video{width:82vw;max-width:780px;border-radius:var(--r-lg);background:#000;aspect-ratio:16/9;border:none;}
 .modal-close-btn{color:white;font-size:13px;cursor:pointer;border:0.5px solid rgba(255,255,255,0.35);border-radius:var(--r-md);padding:7px 18px;background:transparent;display:flex;align-items:center;gap:6px;}
 .modal-close-btn:hover{background:rgba(255,255,255,0.12);}
-
-/* FORM */
 .form-field{margin-bottom:14px;}
 .form-field label{font-size:12px;color:var(--text2);display:block;margin-bottom:5px;font-weight:500;}
-.form-field input,.form-field select,.form-field textarea{width:100%;font-size:13px;padding:8px 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);outline:none;transition:border-color 0.15s;}
+.form-field input,.form-field select,.form-field textarea{width:100%;font-size:13px;padding:8px 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);outline:none;}
 .form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--accent);background:var(--bg);}
 .form-field textarea{resize:vertical;min-height:72px;}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .form-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:14px;border-top:0.5px solid var(--border);}
-.btn{font-size:13px;padding:8px 16px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;transition:all 0.15s;}
+.btn{font-size:13px;padding:8px 16px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;}
 .btn:hover{background:var(--bg2);}
 .btn-primary{background:var(--accent);color:white;border-color:var(--accent);}
 .btn-primary:hover{background:var(--accent2);}
@@ -303,7 +264,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   <p>Loading SignBiz...</p>
 </div>
 
-<!-- LOGIN -->
 <div class="page" id="pageLogin">
   <div class="login-wrap">
     <div class="login-card">
@@ -324,7 +284,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   </div>
 </div>
 
-<!-- HEADER -->
 <header class="header" id="mainHeader" style="display:none;">
   <div class="header-logo"><i class="ti ti-hand-finger"></i><div><div class="header-logo-text">SignBiz</div><div class="header-logo-sub">Business Sign Language</div></div></div>
   <nav class="header-nav">
@@ -344,7 +303,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   </div>
 </header>
 
-<!-- DICTIONARY -->
 <div class="page" id="pageDict">
   <div class="hs-strip">
     <div class="hs-all"><button class="hs-all-btn active" id="hsAllBtn" onclick="setAZ(null)">All signs</button><span class="hs-label">or browse by handshape:</span></div>
@@ -373,7 +331,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   </div>
 </div>
 
-<!-- ADMIN -->
 <div class="page" id="pageAdmin">
   <div class="admin-header">
     <div><div class="admin-title">Manage Dictionary</div><div class="admin-sub" id="adminSub"></div></div>
@@ -390,7 +347,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     <div class="admin-tab" id="atFeedback" onclick="switchAdminTab('feedback')">Feedback</div>
   </div>
 
-  <!-- Signs tab -->
   <div class="admin-tab-panel active" id="apSigns">
     <div class="admin-table-wrap">
       <table class="admin-table">
@@ -400,26 +356,21 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     </div>
   </div>
 
-  <!-- Options tab -->
   <div class="admin-tab-panel" id="apOptions">
     <div class="options-wrap" style="grid-template-columns:1fr;margin-bottom:0;padding-bottom:0;">
-      <div class="cf-new-row" style="flex-wrap:wrap;">
-        <div class="form-field"><label>New category name</label><input type="text" id="newFieldName" placeholder="e.g. Region, Industry, Register..."/></div>
+      <div class="cf-new-row">
+        <div class="form-field"><label>New category name</label><input type="text" id="newFieldName" placeholder="e.g. Region, Industry..."/></div>
         <div class="form-field" style="max-width:180px;"><label>Type</label>
-          <select id="newFieldType">
-            <option value="multiselect">Multi-select</option>
-            <option value="singleselect">Single-select</option>
-          </select>
+          <select id="newFieldType"><option value="multiselect">Multi-select</option><option value="singleselect">Single-select</option></select>
         </div>
         <div class="form-field" style="flex:2;"><label>Starting options (comma-separated)</label><input type="text" id="newFieldOptions" placeholder="e.g. North, South, East, West"/></div>
         <div style="padding-bottom:0;"><button class="btn btn-primary" onclick="addNewCategoryBlock()" style="margin-top:20px;"><i class="ti ti-plus"></i> New category</button></div>
       </div>
-      <p class="options-note" style="margin-top:-8px;margin-bottom:14px;">⚠ Add at least one option now, or the category will show empty in the sign editor — you can always add more later.</p>
+      <p class="options-note" style="margin-top:-8px;margin-bottom:14px;">Tip: add starting options now so the category isn't empty in the sign editor.</p>
     </div>
     <div class="options-wrap" id="optionsCardsWrap"></div>
   </div>
 
-  <!-- Handshapes tab -->
   <div class="admin-tab-panel" id="apHandshapes">
     <div class="hs-manage-wrap">
       <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">Upload images for each handshape. Double-click any letter in the strip to upload directly.</p>
@@ -431,11 +382,10 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     </div>
   </div>
 
-  <!-- Feedback tab -->
   <div class="admin-tab-panel" id="apFeedback">
     <div class="fb-admin-wrap">
       <div class="fb-admin-filters">
-        <select id="fbFilterType" onchange="renderFeedbackAdmin()"><option value="">All types</option><option>Bug</option><option>Suggestion</option><option>Other</option><option>General</option></select>
+        <select id="fbFilterType" onchange="renderFeedbackAdmin()"><option value="">All types</option><option>Bug</option><option>Suggestion</option><option>Other</option></select>
         <select id="fbFilterStars" onchange="renderFeedbackAdmin()"><option value="">All ratings</option><option value="5">5 ★</option><option value="4">4 ★</option><option value="3">3 ★</option><option value="2">2 ★</option><option value="1">1 ★</option></select>
         <button class="btn" onclick="renderFeedbackAdmin()"><i class="ti ti-refresh"></i> Refresh</button>
       </div>
@@ -444,7 +394,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   </div>
 </div>
 
-<!-- ABOUT -->
 <div class="page" id="pageAbout">
   <div style="max-width:600px;margin:40px auto;background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;">
     <h2 style="font-size:20px;font-weight:500;margin-bottom:8px;">About SignBiz</h2>
@@ -453,7 +402,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   </div>
 </div>
 
-<!-- ADD/EDIT MODAL -->
 <div class="modal-overlay" id="editModal">
   <div class="modal-box">
     <div class="modal-title"><span id="modalTitle">Add new sign</span><span class="modal-close-x" onclick="closeEditModal()"><i class="ti ti-x"></i></span></div>
@@ -461,30 +409,14 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
       <div class="form-field"><label>English name *</label><input type="text" id="fEn" placeholder="e.g. Meeting"/></div>
       <div class="form-field"><label>Spanish (Español)</label><input type="text" id="fEs" placeholder="e.g. Reunión"/></div>
     </div>
-    <!-- Category multi-select -->
-    <div class="form-field">
-      <label>Category * <button type="button" onclick="inlineAddOption('cat')" style="margin-left:6px;font-size:11px;padding:2px 8px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+ Add</button></label>
-      <div class="ms-wrap" id="fCatChips"></div>
-    </div>
-    <!-- Topic multi-select -->
-    <div class="form-field">
-      <label>Topic / Subject <button type="button" onclick="inlineAddOption('topic')" style="margin-left:6px;font-size:11px;padding:2px 8px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+ Add</button></label>
-      <div class="ms-wrap" id="fTopicChips"></div>
-    </div>
+    <div id="fDynamicCategories"></div>
     <div class="form-grid">
-      <!-- Handshape multi-select -->
       <div class="form-field">
-        <label>Handshape * <button type="button" onclick="inlineAddOption('hand')" style="margin-left:4px;font-size:11px;padding:2px 6px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+</button></label>
+        <label>Handshape * <button type="button" class="inline-add-btn" style="height:auto;padding:1px 8px;font-size:14px;" onclick="inlineAddBuiltin('hand')">+</button></label>
         <div class="ms-wrap" id="fHandChips"></div>
-      </div>
-      <!-- Difficulty single-select -->
-      <div class="form-field">
-        <label>Difficulty <button type="button" onclick="inlineAddOption('diff')" style="margin-left:4px;font-size:11px;padding:2px 6px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+</button></label>
-        <div class="ms-wrap" id="fDiffChips"></div>
       </div>
     </div>
     <div class="form-field"><label>How to sign (description)</label><textarea id="fDesc" placeholder="Describe the hand movement step by step..."></textarea></div>
-    <!-- YouTube IDs -->
     <div style="background:var(--bg2);border-radius:var(--r-md);padding:12px 14px;margin-bottom:14px;">
       <p style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;"><i class="ti ti-brand-youtube" style="color:#FF0000;margin-right:5px;"></i>YouTube Video IDs (Unlisted)</p>
       <div class="form-grid">
@@ -493,11 +425,8 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
         <div class="form-field" style="margin-bottom:0;grid-column:1/-1;"><label style="color:var(--vexample);">● Example</label><input type="text" id="fVidExample" placeholder="e.g. dQw4w9WgXcQ"/></div>
       </div>
     </div>
-    <!-- Custom fields -->
-    <div id="fCustomFields"></div>
-    <!-- Special tags -->
     <div class="form-field">
-      <label>Special tags <button type="button" onclick="inlineAddOption('tag')" style="margin-left:6px;font-size:11px;padding:2px 8px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+ Add tag</button></label>
+      <label>Special tags <button type="button" onclick="inlineAddBuiltin('tag')" style="margin-left:6px;font-size:11px;padding:2px 8px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+ Add tag</button></label>
       <div class="ms-wrap" id="formTags"></div>
     </div>
     <div class="form-footer">
@@ -507,7 +436,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   </div>
 </div>
 
-<!-- DELETE MODAL -->
 <div class="modal-overlay" id="deleteModal">
   <div class="modal-box" style="max-width:380px;">
     <div class="modal-title"><span>Delete sign</span><span class="modal-close-x" onclick="closeDeleteModal()"><i class="ti ti-x"></i></span></div>
@@ -518,17 +446,15 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   </div>
 </div>
 
-<!-- FULLSCREEN VIDEO -->
 <div class="modal-overlay" id="fsModal">
   <iframe class="modal-video" id="fsIframe" allow="autoplay; fullscreen" allowfullscreen></iframe>
   <button class="modal-close-btn" onclick="closeFsModal()"><i class="ti ti-x"></i> Close</button>
 </div>
 
 <div class="toast" id="toast"></div>
-
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, addDoc, getDoc, query, orderBy }
+import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, addDoc, query, orderBy, onSnapshot }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
@@ -537,13 +463,15 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopu
    🔧 PASTE YOUR FIREBASE CONFIG HERE
 ══════════════════════════════════════ */
 const firebaseConfig = {
-  apiKey: "AIzaSyAmXBA0A9OXnABpqI1oDnh4R16UuvxFlFU",
-  authDomain: "biztest-fc0dc.firebaseapp.com",
-  projectId: "biztest-fc0dc",
-  storageBucket: "biztest-fc0dc.firebasestorage.app",
-  messagingSenderId: "672962321323",
-  appId: "1:672962321323:web:7b1057005356817100d0ee"
+  apiKey: "AIzaSyDNnpPqzk_aQpjjThQkp486l3FuyDpajQI",
+  authDomain: "biztest-afd10.firebaseapp.com",
+  projectId: "biztest-afd10",
+  storageBucket: "biztest-afd10.firebasestorage.app",
+  messagingSenderId: "146662295145",
+  appId: "1:146662295145:web:e344d2dc0b1dba4a6984f8"
 };
+
+
 /* ══════════════════════════════════════ */
 
 const app  = initializeApp(firebaseConfig);
@@ -551,110 +479,130 @@ const db   = getFirestore(app);
 const auth = getAuth(app);
 const gp   = new GoogleAuthProvider();
 
-/* ══ STATE ══ */
-let WORDS        = [];
-let CATEGORIES   = ["Greetings","Meetings","Time","Documents","Communication","Numbers","Other"];
-let DIFFICULTIES = ["Beginner","Intermediate","Advanced"];
-let TOPICS       = ["Workplace","Finance","HR","Customer Service","Technology","Leadership"];
-let SPECIAL_TAGS = ["Two-handed","One-handed","Symmetric","Body contact","Facial expression","Slow motion","High frequency"];
-let HANDSHAPES   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-let CUSTOM_FIELDS = []; // [{id, name, type, options:[]}]
-let hsImageMap   = {};
-let FEEDBACKS    = [];
+/* ══════════════════════════════════════
+   DATA MODEL (all per-document, no shared arrays in Firestore)
+   Each value below is loaded as an array of {id, value} docs from its
+   own collection. Adding/renaming/deleting one item only ever touches
+   ONE Firestore document — never overwrites siblings.
+══════════════════════════════════════ */
+let WORDS         = [];   // signs/{id}
+let CATEGORIES    = [];   // categories/{id} → {value}
+let TOPICS        = [];   // topics/{id} → {value}      (built-in "Topics/Subjects" category)
+let DIFFICULTIES  = [];   // difficulties/{id} → {value}
+let SPECIAL_TAGS  = [];   // tags/{id} → {value}
+let HANDSHAPES    = [];   // handshapes/{id} → {value, image?}
+let CUSTOM_FIELDS = [];   // customFields/{id} → {name, type}
+let CUSTOM_OPTIONS= [];   // customFieldOptions/{id} → {fieldId, value}
+let FEEDBACKS     = [];   // feedback/{id}
 
-let activeAZ       = null;
-let activeSpecial  = [];
-let activeFilters  = {}; // fieldKey → [values] for multiselect filters
-let activeWord     = null;
-let activeVideoType = 'how';
-let editingId      = null;
-let deletingId     = null;
-let editFormSpecial = [];
-let editFormValues  = {}; // fieldKey → value(s)
-let currentLang    = 'en';
-let currentUser    = null;
+let activeAZ=null, activeSpecial=[], activeWord=null, activeVideoType='how';
+let editingId=null, deletingId=null, editFormSpecial=[], editFormValues={};
+let currentLang='en', currentUser=null;
+let fbRating=0, fbType='';
 
-// Feedback state
-let fbRating   = 0;
-let fbType     = '';
-let fbSignId   = null; // null = general
-
-const CAT_C = {"Greetings":["#EEEDFE","#534AB7"],"Meetings":["#E1F5EE","#0F6E56"],"Time":["#FAEEDA","#854F0B"],"Documents":["#FAECE7","#993C1D"],"Communication":["#E6F1FB","#185FA5"],"Numbers":["#EAF3DE","#3B6D11"],"Other":["#F1EFE8","#5F5E5A"]};
-const DIFF_C  = {"Beginner":["#E1F5EE","#0F6E56"],"Intermediate":["#FAEEDA","#854F0B"],"Advanced":["#FAECE7","#993C1D"]};
-const VID_META = {
-  how:     {icon:'ti-hand-finger', label:'How to Sign', color:'var(--vhow)',     light:'var(--vhow-light)'},
-  concept: {icon:'ti-bulb',        label:'Concept',     color:'var(--vconcept)', light:'var(--vconcept-light)'},
-  example: {icon:'ti-message',     label:'Example',     color:'var(--vexample)', light:'var(--vexample-light)'},
+const CAT_C={"_default":["#F1EFE8","#444441"]};
+const PALETTE=[["#EEEDFE","#534AB7"],["#E1F5EE","#0F6E56"],["#FAEEDA","#854F0B"],["#FAECE7","#993C1D"],["#E6F1FB","#185FA5"],["#EAF3DE","#3B6D11"],["#F1EFE8","#5F5E5A"]];
+function colorFor(str){ let h=0; for(let i=0;i<str.length;i++) h=str.charCodeAt(i)+((h<<5)-h); return PALETTE[Math.abs(h)%PALETTE.length]; }
+const DIFF_C={"Beginner":["#E1F5EE","#0F6E56"],"Intermediate":["#FAEEDA","#854F0B"],"Advanced":["#FAECE7","#993C1D"]};
+const VID_META={
+  how:{icon:'ti-hand-finger',label:'How to Sign',color:'var(--vhow)',light:'var(--vhow-light)'},
+  concept:{icon:'ti-bulb',label:'Concept',color:'var(--vconcept)',light:'var(--vconcept-light)'},
+  example:{icon:'ti-message',label:'Example',color:'var(--vexample)',light:'var(--vexample-light)'},
 };
 
-/* ══ FIRESTORE ══ */
+/* ══════════════════════════════════════
+   FIRESTORE — load helpers (each collection independent)
+══════════════════════════════════════ */
 function showSaving(on){ document.getElementById('savingIndicator').style.display=on?'flex':'none'; }
 
-async function loadAll() {
-  const snap = await getDocs(collection(db,'signs'));
-  WORDS = snap.docs.map(d=>({id:d.id,...d.data()}));
-  const optSnap = await getDoc(doc(db,'_meta','options'));
-  if (optSnap.exists()) {
-    const d=optSnap.data();
-    if(d.categories)    CATEGORIES    = d.categories;
-    if(d.difficulties)  DIFFICULTIES  = d.difficulties;
-    if(d.topics)        TOPICS        = d.topics;
-    if(d.tags)          SPECIAL_TAGS  = d.tags;
-    if(d.handshapes)    HANDSHAPES    = d.handshapes;
-    if(d.hsImages)      hsImageMap    = d.hsImages;
-    if(d.customFields)  CUSTOM_FIELDS = d.customFields;
-  }
+async function loadCollection(name){
+  const snap = await getDocs(collection(db,name));
+  return snap.docs.map(d=>({id:d.id,...d.data()}));
 }
 
-async function saveOptions() {
+async function loadAll(){
+  WORDS         = await loadCollection('signs');
+  CATEGORIES    = await loadCollection('categories');
+  TOPICS        = await loadCollection('topics');
+  DIFFICULTIES  = await loadCollection('difficulties');
+  SPECIAL_TAGS  = await loadCollection('tags');
+  HANDSHAPES    = await loadCollection('handshapes');
+  CUSTOM_FIELDS = await loadCollection('customFields');
+  CUSTOM_OPTIONS= await loadCollection('customFieldOptions');
+
+  // Seed built-in defaults ONLY if completely empty (first run)
+  if(!CATEGORIES.length) await seedDefaults();
+}
+
+async function seedDefaults(){
+  const cats=["Greetings","Meetings","Time","Documents","Communication","Numbers","Other"];
+  const tops=["Workplace","Finance","HR","Customer Service","Technology","Leadership"];
+  const diffs=["Beginner","Intermediate","Advanced"];
+  const tags=["Two-handed","One-handed","Symmetric","Body contact","Facial expression","Slow motion","High frequency"];
+  const hands="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  for(const v of cats)  await addDoc(collection(db,'categories'),{value:v});
+  for(const v of tops)  await addDoc(collection(db,'topics'),{value:v});
+  for(const v of diffs) await addDoc(collection(db,'difficulties'),{value:v});
+  for(const v of tags)  await addDoc(collection(db,'tags'),{value:v});
+  for(const v of hands) await addDoc(collection(db,'handshapes'),{value:v});
+  CATEGORIES   = await loadCollection('categories');
+  TOPICS       = await loadCollection('topics');
+  DIFFICULTIES = await loadCollection('difficulties');
+  SPECIAL_TAGS = await loadCollection('tags');
+  HANDSHAPES   = await loadCollection('handshapes');
+}
+
+// Generic CRUD for a "simple value" collection (categories/topics/difficulties/tags/handshapes)
+async function addValue(colName, value, extra={}){
   showSaving(true);
-  try {
-    await setDoc(doc(db,'_meta','options'),{
-      categories:CATEGORIES, difficulties:DIFFICULTIES, topics:TOPICS,
-      tags:SPECIAL_TAGS, handshapes:HANDSHAPES, hsImages:hsImageMap, customFields:CUSTOM_FIELDS
-    });
-  } catch(err) {
-    console.error('saveOptions failed:', err);
-    showToast('⚠ Could not save. Check your connection and try again.');
-  }
-  showSaving(false);
+  try{ const ref=await addDoc(collection(db,colName),{value,...extra}); return {id:ref.id,value,...extra}; }
+  catch(err){ console.error(err); showToast('⚠ Could not save. Try again.'); return null; }
+  finally{ showSaving(false); }
+}
+async function updateValueDoc(colName, id, data){
+  showSaving(true);
+  try{ await setDoc(doc(db,colName,id), data, {merge:true}); }
+  catch(err){ console.error(err); showToast('⚠ Could not save. Try again.'); }
+  finally{ showSaving(false); }
+}
+async function deleteValueDoc(colName, id){
+  showSaving(true);
+  try{ await deleteDoc(doc(db,colName,id)); }
+  catch(err){ console.error(err); showToast('⚠ Could not delete. Try again.'); }
+  finally{ showSaving(false); }
 }
 
-// Re-fetch the latest options from Firestore into memory (call before any edit
-// that touches CATEGORIES/TOPICS/etc, so we never overwrite teammates' changes)
-async function refreshOptions() {
-  const optSnap = await getDoc(doc(db,'_meta','options'));
-  if (optSnap.exists()) {
-    const d=optSnap.data();
-    CATEGORIES    = d.categories    || CATEGORIES;
-    DIFFICULTIES  = d.difficulties  || DIFFICULTIES;
-    TOPICS        = d.topics        || TOPICS;
-    SPECIAL_TAGS  = d.tags          || SPECIAL_TAGS;
-    HANDSHAPES    = d.handshapes    || HANDSHAPES;
-    hsImageMap    = d.hsImages      || hsImageMap;
-    CUSTOM_FIELDS = d.customFields  || CUSTOM_FIELDS;
-  }
+async function saveWord(w){
+  showSaving(true);
+  try{ await setDoc(doc(db,'signs',String(w.id)),w); }
+  catch(err){ console.error(err); showToast('⚠ Could not save sign.'); }
+  finally{ showSaving(false); }
+}
+async function deleteWordDoc(id){
+  showSaving(true);
+  try{ await deleteDoc(doc(db,'signs',String(id))); }
+  catch(err){ console.error(err); showToast('⚠ Could not delete.'); }
+  finally{ showSaving(false); }
 }
 
-async function saveWord(w) { showSaving(true); await setDoc(doc(db,'signs',String(w.id)),w); showSaving(false); }
-async function deleteWord(id) { showSaving(true); await deleteDoc(doc(db,'signs',String(id))); showSaving(false); }
-
-async function loadFeedback() {
-  const snap = await getDocs(query(collection(db,'feedback'), orderBy('ts','desc')));
-  FEEDBACKS = snap.docs.map(d=>({id:d.id,...d.data()}));
+async function loadFeedback(){
+  try{
+    const snap = await getDocs(query(collection(db,'feedback'), orderBy('ts','desc')));
+    FEEDBACKS = snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(err){ console.error('loadFeedback failed (check Firestore rules):', err); FEEDBACKS=[]; }
 }
 
 /* ══ AUTH ══ */
-window.loginEmail_pw = async function() {
+window.loginEmail_pw=async function(){
   const e=document.getElementById('loginEmail').value.trim(), p=document.getElementById('loginPassword').value;
   const err=document.getElementById('loginError'); err.style.display='none';
   try{ await signInWithEmailAndPassword(auth,e,p); } catch(ex){ err.textContent=ex.message; err.style.display='block'; }
 };
-window.loginGoogle  = async function(){ try{ await signInWithPopup(auth,gp); }catch(ex){ showToast('Google error: '+ex.message); } };
-window.cancelLogin  = function(){ showPage('dict'); };
-window.doLogout     = async function(){ await signOut(auth); showToast('Signed out'); };
+window.loginGoogle=async function(){ try{ await signInWithPopup(auth,gp); }catch(ex){ showToast('Google error: '+ex.message); } };
+window.cancelLogin=function(){ showPage('dict'); };
+window.doLogout=async function(){ await signOut(auth); showToast('Signed out'); };
 
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth, user=>{
   currentUser=user;
   const uEl=document.getElementById('headerUser'), aBtn=document.getElementById('adminNavBtn'),
         lBtn=document.getElementById('loginNavBtn'), oBtn=document.getElementById('logoutBtn');
@@ -670,18 +618,17 @@ onAuthStateChanged(auth, user => {
 });
 
 /* ══ PAGE ROUTING ══ */
-window.showPage = function(p) {
+window.showPage=function(p){
   if(p==='admin'&&!currentUser){ showPage('login'); return; }
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-  if(p==='login')  { document.getElementById('pageLogin').classList.add('active'); }
-  else if(p==='dict')  { document.getElementById('pageDict').classList.add('active'); document.getElementById('navDict').classList.add('active'); }
-  else if(p==='admin') { document.getElementById('pageAdmin').classList.add('active'); switchAdminTab('signs'); renderAdminTable(); }
-  else if(p==='about') { document.getElementById('pageAbout').classList.add('active'); document.getElementById('navAbout').classList.add('active'); }
+  if(p==='login'){ document.getElementById('pageLogin').classList.add('active'); }
+  else if(p==='dict'){ document.getElementById('pageDict').classList.add('active'); document.getElementById('navDict').classList.add('active'); }
+  else if(p==='admin'){ document.getElementById('pageAdmin').classList.add('active'); switchAdminTab('signs'); renderAdminTable(); }
+  else if(p==='about'){ document.getElementById('pageAbout').classList.add('active'); document.getElementById('navAbout').classList.add('active'); }
 };
 
-/* ══ LANG ══ */
-window.setLang = function(lang) {
+window.setLang=function(lang){
   currentLang=lang;
   document.querySelectorAll('.lang-btn').forEach((b,i)=>b.classList.toggle('active',(i===0&&lang==='en')||(i===1&&lang==='es')));
   doFilter();
@@ -689,21 +636,23 @@ window.setLang = function(lang) {
 };
 
 /* ══ HANDSHAPE STRIP ══ */
-function buildHsGrid() {
+function buildHsGrid(){
   const grid=document.getElementById('hsGrid'); grid.innerHTML='';
-  const handSet=new Set(WORDS.flatMap(w=>Array.isArray(w.hand)?w.hand:[w.hand]).filter(Boolean));
-  HANDSHAPES.forEach(l=>{
+  const handSet=new Set(WORDS.flatMap(w=>Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[])));
+  HANDSHAPES.forEach(h=>{
+    const l=h.value;
     const has=handSet.has(l);
     const cell=document.createElement('div');
-    cell.className='hs-cell'+(has?'':' no-data')+(activeAZ===l?' active':'');
-    if(hsImageMap[l]){ const img=document.createElement('img'); img.src=hsImageMap[l]; img.alt=l; cell.appendChild(img); }
+    cell.className='hs-cell'+(activeAZ===l?' active':'');
+    cell.style.opacity=has?'1':'0.35';
+    if(h.image){ const img=document.createElement('img'); img.src=h.image; img.alt=l; cell.appendChild(img); }
     else { const sp=document.createElement('span'); sp.className='hs-letter'; sp.textContent=l; cell.appendChild(sp); }
     const badge=document.createElement('span'); badge.className='hs-badge'; badge.textContent=l; cell.appendChild(badge);
-    if(has) cell.onclick=()=>setAZ(activeAZ===l?null:l);
+    cell.onclick=()=>setAZ(activeAZ===l?null:l);
     cell.addEventListener('dblclick',()=>{
       if(!currentUser) return;
       const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
-      inp.onchange=async e=>{ const f=e.target.files[0]; if(!f) return; hsImageMap[l]=await fileToB64(f); await saveOptions(); buildHsGrid(); renderHsMgGrid(); showToast(`Handshape ${l} updated`); };
+      inp.onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const b64=await fileToB64(f); await updateValueDoc('handshapes',h.id,{image:b64}); h.image=b64; buildHsGrid(); renderHsMgGrid(); showToast(`Handshape ${l} updated`); };
       inp.click();
     });
     grid.appendChild(cell);
@@ -714,90 +663,81 @@ window.setAZ=function(l){ activeAZ=l; buildHsGrid(); doFilter(); };
 function fileToB64(f){ return new Promise(res=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.readAsDataURL(f); }); }
 
 /* ══ FILTER PANEL ══ */
-function buildFilterPanel() {
-  const wrap = document.getElementById('filterFieldsWrap');
-  wrap.innerHTML = '';
+function builtinCategoryDefs(){
+  return [
+    {key:'cat',   name:'Category',   arr:CATEGORIES,   field:'cat',   type:'multiselect'},
+    {key:'topic', name:'Topic',      arr:TOPICS,       field:'topic', type:'multiselect'},
+    {key:'diff',  name:'Difficulty', arr:DIFFICULTIES, field:'diff',  type:'singleselect'},
+  ];
+}
+function customCategoryDefs(){
+  return CUSTOM_FIELDS.map(cf=>({
+    key:'cf_'+cf.id, name:cf.name,
+    arr:CUSTOM_OPTIONS.filter(o=>o.fieldId===cf.id),
+    field:'cf_'+cf.id, type:cf.type
+  }));
+}
+function allCategoryDefs(){ return [...builtinCategoryDefs(), ...customCategoryDefs()]; }
 
-  // Helper: build a filter select
-  function makeSelect(id, label, opts) {
+function buildFilterPanel(){
+  const wrap=document.getElementById('filterFieldsWrap'); wrap.innerHTML='';
+  function makeSelect(id,label,values){
     const d=document.createElement('div'); d.className='adv-field';
     d.innerHTML=`<label>${label}</label><select id="${id}" onchange="doFilter()"><option value="">All</option></select>`;
-    opts.forEach(o=>{ const el=document.createElement('option'); el.value=o; el.textContent=o; d.querySelector('select').appendChild(el); });
+    const sel=d.querySelector('select');
+    values.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
     return d;
   }
-
-  wrap.appendChild(makeSelect('fCat',   'Category',   CATEGORIES));
-  wrap.appendChild(makeSelect('fTopic', 'Topic',      TOPICS));
-  wrap.appendChild(makeSelect('fDiff',  'Difficulty', DIFFICULTIES));
-
-  // Handshape filter
-  const hands=[...new Set(WORDS.flatMap(w=>Array.isArray(w.hand)?w.hand:[w.hand]).filter(Boolean))].sort();
-  wrap.appendChild(makeSelect('fHand', 'Handshape', hands.map(h=>`Handshape ${h}`)));
-
-  // Videos filter
+  allCategoryDefs().forEach(def=>{
+    wrap.appendChild(makeSelect('f_'+def.key, def.name, def.arr.map(x=>x.value)));
+  });
+  const hands=[...new Set(WORDS.flatMap(w=>Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[])))].sort();
+  wrap.appendChild(makeSelect('fHand','Handshape',hands));
   const vd=document.createElement('div'); vd.className='adv-field';
   vd.innerHTML=`<label>Videos</label><select id="fVid" onchange="doFilter()"><option value="">All</option><option value="how">Has How-to</option><option value="concept">Has Concept</option><option value="example">Has Example</option></select>`;
   wrap.appendChild(vd);
-
-  // Custom fields filters
-  CUSTOM_FIELDS.forEach(cf=>{
-    if(cf.type==='text') return;
-    wrap.appendChild(makeSelect('fcf_'+cf.id, cf.name, cf.options||[]));
-  });
 }
 
-function buildFilterTags() {
+function buildFilterTags(){
   const el=document.getElementById('filterTags'); el.innerHTML='';
-  SPECIAL_TAGS.forEach(s=>{
-    const t=document.createElement('span');
-    t.className='adv-tag'+(activeSpecial.includes(s)?' on':''); t.textContent=s;
-    t.onclick=()=>{ if(activeSpecial.includes(s)) activeSpecial=activeSpecial.filter(x=>x!==s); else activeSpecial.push(s); t.classList.toggle('on'); doFilter(); };
-    el.appendChild(t);
+  SPECIAL_TAGS.forEach(t=>{
+    const s=document.createElement('span');
+    s.className='adv-tag'+(activeSpecial.includes(t.value)?' on':''); s.textContent=t.value;
+    s.onclick=()=>{ if(activeSpecial.includes(t.value)) activeSpecial=activeSpecial.filter(x=>x!==t.value); else activeSpecial.push(t.value); s.classList.toggle('on'); doFilter(); };
+    el.appendChild(s);
   });
 }
 
 /* ══ FILTER + LIST ══ */
-window.doFilter = function() {
+window.doFilter=function(){
   const q=(document.getElementById('globalSearch').value||'').trim().toLowerCase();
-  const fCat   = document.getElementById('fCat')  ?.value || '';
-  const fTopic = document.getElementById('fTopic')?.value || '';
-  const fDiff  = document.getElementById('fDiff') ?.value || '';
-  const fHandEl= document.getElementById('fHand') ?.value || '';
-  const fHand  = fHandEl.replace('Handshape ','');
-  const fVid   = document.getElementById('fVid')  ?.value || '';
+  const fHand=document.getElementById('fHand')?.value||'';
+  const fVid=document.getElementById('fVid')?.value||'';
+  const defs=allCategoryDefs();
 
-  const list = WORDS.filter(w=>{
+  const list=WORDS.filter(w=>{
     if(q && !w.en.toLowerCase().includes(q) && !(w.es||'').toLowerCase().includes(q)) return false;
-    const cats  = Array.isArray(w.cat)   ? w.cat   : (w.cat   ? [w.cat]   : []);
-    const tops  = Array.isArray(w.topic) ? w.topic : (w.topic ? [w.topic] : []);
-    const hands = Array.isArray(w.hand)  ? w.hand  : (w.hand  ? [w.hand]  : []);
-    if(fCat   && !cats.includes(fCat))   return false;
-    if(fTopic && !tops.includes(fTopic)) return false;
-    if(fDiff  && w.diff!==fDiff)         return false;
+    const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
     if(activeAZ && !hands.includes(activeAZ)) return false;
-    if(fHand  && !hands.includes(fHand)) return false;
-    if(fVid   && !w['vid_'+fVid])        return false;
+    if(fHand && !hands.includes(fHand)) return false;
+    if(fVid && !w['vid_'+fVid]) return false;
     if(activeSpecial.length && !activeSpecial.every(s=>(w.special||[]).includes(s))) return false;
-    // Custom field filters
-    for(const cf of CUSTOM_FIELDS) {
-      if(cf.type==='text') continue;
-      const fVal = document.getElementById('fcf_'+cf.id)?.value||'';
+    for(const def of defs){
+      const fVal=document.getElementById('f_'+def.key)?.value||'';
       if(!fVal) continue;
-      const wVal = w['cf_'+cf.id];
-      const wArr = Array.isArray(wVal)?wVal:(wVal?[wVal]:[]);
-      if(!wArr.includes(fVal)) return false;
+      const wVal=w[def.field];
+      if(def.type==='singleselect'){ if(wVal!==fVal) return false; }
+      else { const arr=Array.isArray(wVal)?wVal:(wVal?[wVal]:[]); if(!arr.includes(fVal)) return false; }
     }
     return true;
   });
 
-  document.getElementById('resultCount').textContent =
-    list.length===WORDS.length?`${list.length} signs`:`${list.length} of ${WORDS.length} signs`;
-
+  document.getElementById('resultCount').textContent=list.length===WORDS.length?`${list.length} signs`:`${list.length} of ${WORDS.length} signs`;
   const el=document.getElementById('wordList');
   if(!list.length){ el.innerHTML='<div class="no-results">No signs match your filters.</div>'; return; }
   el.innerHTML=list.map(w=>{
     const cats=Array.isArray(w.cat)?w.cat:(w.cat?[w.cat]:[]);
-    const cc=CAT_C[cats[0]]||["#F1EFE8","#444441"];
+    const cc=cats[0]?colorFor(cats[0]):CAT_C._default;
     const sub=currentLang==='es'&&w.es?w.es:(cats[0]||'');
     const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
     return `<div class="word-row${activeWord===w.id?' active':''}" onclick="selectWord('${w.id}')">
@@ -809,8 +749,8 @@ window.doFilter = function() {
 };
 
 window.resetFilters=function(){
-  ['fCat','fTopic','fDiff','fHand','fVid'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-  CUSTOM_FIELDS.forEach(cf=>{ const el=document.getElementById('fcf_'+cf.id); if(el) el.value=''; });
+  allCategoryDefs().forEach(def=>{ const el=document.getElementById('f_'+def.key); if(el) el.value=''; });
+  ['fHand','fVid'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   activeSpecial=[]; activeAZ=null;
   document.querySelectorAll('#filterTags .adv-tag').forEach(t=>t.classList.remove('on'));
   buildHsGrid(); doFilter();
@@ -820,24 +760,19 @@ window.toggleAdv=function(){ document.getElementById('advPanel').classList.toggl
 /* ══ DETAIL VIEW ══ */
 window.selectWord=function(id){ const w=WORDS.find(x=>x.id===id); if(!w) return; activeWord=w.id; activeVideoType='how'; doFilter(); renderDetail(w); };
 
-function renderDetail(w) {
-  const cats  = Array.isArray(w.cat)   ? w.cat   : (w.cat   ? [w.cat]   : []);
-  const hands = Array.isArray(w.hand)  ? w.hand  : (w.hand  ? [w.hand]  : []);
-  const tops  = Array.isArray(w.topic) ? w.topic : (w.topic ? [w.topic] : []);
-  const dc=DIFF_C[w.diff]||["#F1EFE8","#444441"];
-
-  const catPills=cats.map(c=>{ const cc=CAT_C[c]||["#F1EFE8","#444441"]; return `<span class="pill" style="background:${cc[0]};color:${cc[1]}">${c}</span>`; }).join('');
-  const topPills=tops.map(t=>`<span class="pill" style="background:#EAF3DE;color:#3B6D11;"><i class="ti ti-tag" style="font-size:9px;margin-right:2px;"></i>${t}</span>`).join('');
+function renderDetail(w){
+  const dc=DIFF_C[w.diff]||CAT_C._default;
+  const defs=allCategoryDefs();
+  const pillsHtml=defs.map(def=>{
+    const wVal=w[def.field];
+    const vals=def.type==='singleselect'?(wVal?[wVal]:[]):(Array.isArray(wVal)?wVal:(wVal?[wVal]:[]));
+    if(!vals.length) return '';
+    if(def.key==='diff') return vals.map(v=>`<span class="pill" style="background:${dc[0]};color:${dc[1]}">${v}</span>`).join('');
+    return vals.map(v=>{ const cc=colorFor(def.name+v); return `<span class="pill" style="background:${cc[0]};color:${cc[1]}">${def.key.startsWith('cf_')?def.name+': ':''}${v}</span>`; }).join('');
+  }).join('');
+  const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
   const handPills=hands.map(h=>`<span class="pill" style="background:var(--accent-light);color:var(--accent)">Handshape ${h}</span>`).join('');
   const specialPills=(w.special||[]).map(s=>`<span class="pill" style="background:var(--bg2);color:var(--text2);border:0.5px solid var(--border)">${s}</span>`).join('');
-
-  // Custom field pills
-  const cfPills=CUSTOM_FIELDS.map(cf=>{
-    const val=w['cf_'+cf.id];
-    if(!val||(Array.isArray(val)&&!val.length)) return '';
-    const vals=Array.isArray(val)?val:[val];
-    return vals.map(v=>`<span class="pill" style="background:#F1EFE8;color:#5F5E5A;border:0.5px solid var(--border)">${cf.name}: ${v}</span>`).join('');
-  }).join('');
 
   const tabs=['how','concept','example'].map(type=>{
     const m=VID_META[type]; const isActive=type===activeVideoType;
@@ -850,32 +785,20 @@ function renderDetail(w) {
       <button style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.55);border:none;border-radius:var(--r-sm);padding:5px 10px;color:white;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="openFsModal('${ytId}')"><i class="ti ti-maximize"></i> Fullscreen</button>`
     :`<div class="vid-ph"><i class="ti ti-video-off"></i><p>No video yet for <strong>${VID_META[activeVideoType].label}</strong></p></div>`;
 
-  // Custom field details
-  const cfDetails=CUSTOM_FIELDS.map(cf=>{
-    const val=w['cf_'+cf.id];
-    if(!val||(Array.isArray(val)&&!val.length)) return '';
-    const vals=Array.isArray(val)?val.join(', '):val;
-    return `<p style="font-size:12px;color:var(--text2);margin-top:6px;"><strong style="color:var(--text);">${cf.name}:</strong> ${vals}</p>`;
-  }).join('');
-
   document.getElementById('rightPanel').innerHTML=`
     <div class="detail-card">
       <p class="entry-en">${w.en}</p>
       ${w.es?`<p class="entry-es">${w.es}</p>`:''}
-      <div class="entry-tags">${catPills}${topPills}${handPills}<span class="pill" style="background:${dc[0]};color:${dc[1]}">${w.diff||''}</span>${specialPills}${cfPills}</div>
+      <div class="entry-tags">${pillsHtml}${handPills}${specialPills}</div>
       <div class="vid-tabs">${tabs}</div>
       <div class="video-box">${videoHtml}</div>
       <p class="entry-desc"><strong>How to sign:</strong> ${w.desc||''}</p>
-      ${cfDetails}
-      <!-- FEEDBACK -->
       <div class="feedback-wrap">
         <div class="feedback-title"><i class="ti ti-message-circle"></i> Leave Feedback</div>
         <div class="star-row" id="starRow_${w.id}">
           ${[1,2,3,4,5].map(n=>`<span class="star" onclick="setFbRating(${n},'${w.id}')" onmouseover="hoverStars(${n},'${w.id}')" onmouseout="resetStarHover('${w.id}')">★</span>`).join('')}
         </div>
-        <div class="fb-type-row">
-          ${['Bug','Suggestion','Other'].map(t=>`<span class="fb-type" onclick="setFbType('${t}','${w.id}')">${t}</span>`).join('')}
-        </div>
+        <div class="fb-type-row">${['Bug','Suggestion','Other'].map(t=>`<span class="fb-type" onclick="setFbType('${t}','${w.id}')">${t}</span>`).join('')}</div>
         <textarea class="fb-textarea" id="fbText_${w.id}" placeholder="Your feedback (optional)..."></textarea>
         <div style="display:flex;align-items:center;gap:12px;">
           <button class="fb-submit" onclick="submitFeedback('${w.id}')">Send feedback</button>
@@ -883,65 +806,51 @@ function renderDetail(w) {
         </div>
       </div>
     </div>`;
-  fbSignId=w.id; fbRating=0; fbType='';
+  fbRating=0; fbType='';
 }
 
 window.switchVideoTab=function(wId,type){ const w=WORDS.find(x=>x.id===wId); if(!w) return; activeVideoType=type; renderDetail(w); };
 window.openFsModal=function(ytId){ document.getElementById('fsIframe').src=`https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0`; document.getElementById('fsModal').classList.add('show'); };
 window.closeFsModal=function(){ document.getElementById('fsIframe').src=''; document.getElementById('fsModal').classList.remove('show'); };
 
-/* ══ FEEDBACK ══ */
-window.setFbRating=function(n, wId){ fbRating=n; updateStars(n, wId); };
-window.hoverStars=function(n, wId){ updateStars(n, wId); };
-window.resetStarHover=function(wId){ updateStars(fbRating, wId); };
-function updateStars(n, wId){
-  const stars=document.querySelectorAll(`#starRow_${wId} .star`);
-  stars.forEach((s,i)=>s.classList.toggle('on',i<n));
-}
-window.setFbType=function(t, wId){
-  fbType=t;
-  document.querySelectorAll(`#rightPanel .fb-type`).forEach(el=>el.classList.toggle('on',el.textContent===t));
-};
+/* ══ FEEDBACK (public submit) ══ */
+window.setFbRating=function(n,wId){ fbRating=n; updateStars(n,wId); };
+window.hoverStars=function(n,wId){ updateStars(n,wId); };
+window.resetStarHover=function(wId){ updateStars(fbRating,wId); };
+function updateStars(n,wId){ document.querySelectorAll(`#starRow_${wId} .star`).forEach((s,i)=>s.classList.toggle('on',i<n)); }
+window.setFbType=function(t,wId){ fbType=t; document.querySelectorAll('#rightPanel .fb-type').forEach(el=>el.classList.toggle('on',el.textContent===t)); };
+
 window.submitFeedback=async function(wId){
   const text=document.getElementById(`fbText_${wId}`)?.value.trim()||'';
   if(!fbRating&&!text){ showToast('Please add a rating or comment.'); return; }
   const w=WORDS.find(x=>x.id===wId);
   try{
-    await addDoc(collection(db,'feedback'),{
-      signId: wId,
-      signName: w?.en||'',
-      rating: fbRating,
-      type: fbType||'Other',
-      text,
-      ts: Date.now(),
-      scope: 'sign'
-    });
-  } catch(err){
-    console.error('Feedback submit failed:', err);
-    showToast('⚠ Could not send feedback. Please try again later.');
+    await addDoc(collection(db,'feedback'),{ signId:wId, signName:w?.en||'', rating:fbRating, type:fbType||'Other', text, ts:Date.now() });
+  }catch(err){
+    console.error('Feedback submit failed:',err);
+    showToast('⚠ Could not send feedback — please try again later.');
     return;
   }
   const sEl=document.getElementById(`fbSuccess_${wId}`);
   if(sEl){ sEl.style.display='flex'; setTimeout(()=>sEl.style.display='none',3000); }
   document.getElementById(`fbText_${wId}`).value='';
-  fbRating=0; fbType='';
-  updateStars(0,wId);
+  fbRating=0; fbType=''; updateStars(0,wId);
   document.querySelectorAll('#rightPanel .fb-type').forEach(el=>el.classList.remove('on'));
   showToast('Feedback submitted!');
 };
 
-/* ══ ADMIN TABLE ══ */
+/* ══ ADMIN: SIGNS TABLE ══ */
 function renderAdminTable(){
   document.getElementById('adminSub').textContent=`${WORDS.length} signs · ${CATEGORIES.length} categories · ${SPECIAL_TAGS.length} tags`;
   document.getElementById('adminTbody').innerHTML=WORDS.map(w=>{
     const cats=Array.isArray(w.cat)?w.cat:(w.cat?[w.cat]:[]);
-    const cc=CAT_C[cats[0]]||["#F1EFE8","#444441"];
+    const cc=cats[0]?colorFor(cats[0]):CAT_C._default;
     const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
     const dots=['how','concept','example'].map(t=>`<span class="vdot ${w['vid_'+t]?'on':'off'}" title="${VID_META[t].label}"></span>`).join('');
     return `<tr>
       <td style="font-weight:500">${w.en}</td>
       <td style="color:var(--text2);font-style:italic">${w.es||'—'}</td>
-      <td>${cats.map(c=>`<span class="pill" style="background:${(CAT_C[c]||["#F1EFE8","#444441"])[0]};color:${(CAT_C[c]||["#F1EFE8","#444441"])[1]};margin-right:2px;">${c}</span>`).join('')}</td>
+      <td>${cats.map(c=>{const x=colorFor(c);return `<span class="pill" style="background:${x[0]};color:${x[1]};margin-right:2px;">${c}</span>`;}).join('')}</td>
       <td>${hands.map(h=>`<span class="pill" style="background:var(--accent-light);color:var(--accent);margin-right:2px;">${h}</span>`).join('')}</td>
       <td style="color:var(--text2)">${w.diff||''}</td>
       <td><div style="display:flex;gap:4px;">${dots}</div></td>
@@ -953,18 +862,15 @@ function renderAdminTable(){
   }).join('');
 }
 
-/* ══ CHIP BUILDERS ══ */
-function buildChips(containerId, arr, selected, onToggle, singleSelect=false) {
+/* ══ CHIPS HELPER ══ */
+function buildChips(containerId, values, selected, onToggle, singleSelect=false){
   const el=document.getElementById(containerId); if(!el) return;
   el.innerHTML='';
-  arr.forEach(v=>{
+  if(!values.length){ el.innerHTML='<p style="font-size:11px;color:var(--text3);">No options yet — use the + button to add one.</p>'; return; }
+  values.forEach(v=>{
     const on=Array.isArray(selected)?selected.includes(v):selected===v;
     const chip=document.createElement('span'); chip.className='ms-chip'+(on?' on':''); chip.textContent=v;
-    chip.onclick=()=>{
-      if(singleSelect){ onToggle(v); return; }
-      const nowOn=chip.classList.toggle('on');
-      onToggle(v,nowOn);
-    };
+    chip.onclick=()=>{ if(singleSelect){ onToggle(v); return; } const nowOn=chip.classList.toggle('on'); onToggle(v,nowOn); };
     el.appendChild(chip);
   });
 }
@@ -974,92 +880,57 @@ window.openAddModal=function(){
   editingId=null; editFormSpecial=[]; editFormValues={};
   document.getElementById('modalTitle').textContent='Add new sign';
   ['fEn','fEs','fDesc','fVidHow','fVidConcept','fVidExample'].forEach(id=>document.getElementById(id).value='');
-  buildModalChips({});
+  buildModalFields({});
   document.getElementById('editModal').classList.add('show');
 };
 
 window.openEditModal=function(id){
   const w=WORDS.find(x=>x.id===id); if(!w) return;
-  editingId=id; editFormSpecial=[...(w.special||[])];
-  editFormValues={};
-  CUSTOM_FIELDS.forEach(cf=>{ editFormValues['cf_'+cf.id]=w['cf_'+cf.id]||(cf.type==='singleselect'?'':[]); });
+  editingId=id; editFormSpecial=[...(w.special||[])]; editFormValues={};
   document.getElementById('modalTitle').textContent='Edit sign';
-  document.getElementById('fEn').value   = w.en||'';
-  document.getElementById('fEs').value   = w.es||'';
-  document.getElementById('fDesc').value = w.desc||'';
-  document.getElementById('fVidHow').value     = w.vid_how||'';
-  document.getElementById('fVidConcept').value = w.vid_concept||'';
-  document.getElementById('fVidExample').value = w.vid_example||'';
-  buildModalChips(w);
+  document.getElementById('fEn').value=w.en||'';
+  document.getElementById('fEs').value=w.es||'';
+  document.getElementById('fDesc').value=w.desc||'';
+  document.getElementById('fVidHow').value=w.vid_how||'';
+  document.getElementById('fVidConcept').value=w.vid_concept||'';
+  document.getElementById('fVidExample').value=w.vid_example||'';
+  buildModalFields(w);
   document.getElementById('editModal').classList.add('show');
 };
 
-function buildModalChips(w) {
-  // Category multi
-  const selCats=Array.isArray(w.cat)?w.cat:(w.cat?[w.cat]:[]);
-  let curCats=[...selCats];
-  buildChips('fCatChips', CATEGORIES, curCats, (v,on)=>{ if(on) curCats.push(v); else curCats=curCats.filter(x=>x!==v); editFormValues.cat=curCats; });
-  editFormValues.cat=curCats;
-
-  // Topic multi
-  const selTops=Array.isArray(w.topic)?w.topic:(w.topic?[w.topic]:[]);
-  let curTops=[...selTops];
-  buildChips('fTopicChips', TOPICS, curTops, (v,on)=>{ if(on) curTops.push(v); else curTops=curTops.filter(x=>x!==v); editFormValues.topic=curTops; });
-  editFormValues.topic=curTops;
-
-  // Handshape multi
-  const selHands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
-  let curHands=[...selHands];
-  buildChips('fHandChips', HANDSHAPES, curHands, (v,on)=>{ if(on) curHands.push(v); else curHands=curHands.filter(x=>x!==v); editFormValues.hand=curHands; });
-  editFormValues.hand=curHands;
-
-  // Difficulty single
-  let curDiff=w.diff||DIFFICULTIES[0]||'';
-  buildChips('fDiffChips', DIFFICULTIES, curDiff, (v)=>{
-    curDiff=v; editFormValues.diff=v;
-    document.querySelectorAll('#fDiffChips .ms-chip').forEach(c=>c.classList.toggle('on',c.textContent===v));
-  }, true);
-  editFormValues.diff=curDiff;
-
-  // Special tags
-  buildChips('formTags', SPECIAL_TAGS, editFormSpecial, (v,on)=>{ if(on) editFormSpecial.push(v); else editFormSpecial=editFormSpecial.filter(x=>x!==v); });
-
-  // Custom fields (rendered exactly like Category/Topic — chip multi/single select)
-  const cfWrap=document.getElementById('fCustomFields'); cfWrap.innerHTML='';
-  CUSTOM_FIELDS.forEach(cf=>{
+function buildModalFields(w){
+  // Dynamic category blocks (built-in cat/topic/diff + all custom fields), in one wrap
+  const wrap=document.getElementById('fDynamicCategories'); wrap.innerHTML='';
+  allCategoryDefs().forEach(def=>{
     const fd=document.createElement('div'); fd.className='form-field';
     const lbl=document.createElement('label');
-    lbl.innerHTML=`${cf.name} <button type="button" onclick="inlineAddCustomOption('${cf.id}')" style="margin-left:4px;font-size:11px;padding:2px 8px;border-radius:20px;border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;">+ Add</button>`;
+    const isBuiltin=['cat','topic','diff'].includes(def.key);
+    lbl.innerHTML=`${def.name}${def.key==='cat'?' *':''} <button type="button" class="inline-add-btn" style="height:auto;padding:1px 8px;font-size:14px;" onclick="${isBuiltin?`inlineAddBuiltin('${def.key}')`:`inlineAddCustom('${def.key.replace('cf_','')}')`}">+</button>`;
     fd.appendChild(lbl);
-    const ms=document.createElement('div'); ms.className='ms-wrap'; ms.id='cfChips_'+cf.id;
+    const ms=document.createElement('div'); ms.className='ms-wrap'; ms.id='chips_'+def.key;
     fd.appendChild(ms);
-    if(!cf.options||!cf.options.length){
-      const hint=document.createElement('p'); hint.style.cssText='font-size:11px;color:var(--text3);margin-top:4px;';
-      hint.textContent='No options yet — click "+ Add" above to create one.';
-      fd.appendChild(hint);
-    }
-    const isSingle=cf.type==='singleselect';
-    let cur=w['cf_'+cf.id]||(isSingle?'':[]); if(!Array.isArray(cur)&&!isSingle) cur=cur?[cur]:[];
-    buildChips('cfChips_'+cf.id, cf.options||[], cur, (v,on)=>{
-      if(isSingle){ editFormValues['cf_'+cf.id]=v; document.querySelectorAll(`#cfChips_${cf.id} .ms-chip`).forEach(c=>c.classList.toggle('on',c.textContent===v)); }
-      else { if(on) cur.push(v); else cur=cur.filter(x=>x!==v); editFormValues['cf_'+cf.id]=cur; }
-    }, isSingle);
-    editFormValues['cf_'+cf.id]=cur;
-    cfWrap.appendChild(fd);
-  });
-}
+    wrap.appendChild(fd);
 
-window.inlineAddCustomOption=async function(cfId){
-  const val=prompt(`New option:`); if(!val?.trim()) return;
-  const v=val.trim();
-  await refreshOptions();
-  const cf=CUSTOM_FIELDS.find(f=>f.id===cfId); if(!cf) return;
-  if(!cf.options) cf.options=[];
-  if(!cf.options.includes(v)) cf.options.push(v);
-  await saveOptions(); buildFilterPanel();
-  buildModalChips(WORDS.find(x=>x.id===editingId)||{});
-  showToast(`"${v}" added to ${cf.name}`);
-};
+    const values=def.arr.map(x=>x.value);
+    const isSingle=def.type==='singleselect';
+    let cur = isSingle ? (w[def.field]||'') : (Array.isArray(w[def.field])?[...w[def.field]]:(w[def.field]?[w[def.field]]:[]));
+    buildChips('chips_'+def.key, values, cur, (v,on)=>{
+      if(isSingle){ cur=v; editFormValues[def.field]=v; document.querySelectorAll(`#chips_${def.key} .ms-chip`).forEach(c=>c.classList.toggle('on',c.textContent===v)); }
+      else { if(on) cur.push(v); else cur=cur.filter(x=>x!==v); editFormValues[def.field]=cur; }
+    }, isSingle);
+    editFormValues[def.field]=cur;
+  });
+
+  // Handshape (always built-in, multi-select)
+  const handValues=HANDSHAPES.map(h=>h.value);
+  let curHands=Array.isArray(w.hand)?[...w.hand]:(w.hand?[w.hand]:[]);
+  buildChips('fHandChips', handValues, curHands, (v,on)=>{ if(on) curHands.push(v); else curHands=curHands.filter(x=>x!==v); editFormValues.hand=curHands; });
+  editFormValues.hand=curHands;
+
+  // Special tags
+  const tagValues=SPECIAL_TAGS.map(t=>t.value);
+  buildChips('formTags', tagValues, editFormSpecial, (v,on)=>{ if(on) editFormSpecial.push(v); else editFormSpecial=editFormSpecial.filter(x=>x!==v); });
+}
 
 window.closeEditModal=function(){ document.getElementById('editModal').classList.remove('show'); };
 
@@ -1070,14 +941,15 @@ window.saveSign=async function(){
   if(!en||!cat.length||!hand.length){ showToast('Please fill in name, at least one category, and one handshape.'); return; }
   const data={
     en, es:document.getElementById('fEs').value.trim(),
-    cat, topic:editFormValues.topic||[], hand, diff:editFormValues.diff||'',
     desc:document.getElementById('fDesc').value.trim(),
     vid_how:document.getElementById('fVidHow').value.trim(),
     vid_concept:document.getElementById('fVidConcept').value.trim(),
     vid_example:document.getElementById('fVidExample').value.trim(),
     special:[...editFormSpecial],
+    hand,
   };
-  CUSTOM_FIELDS.forEach(cf=>{ data['cf_'+cf.id]=editFormValues['cf_'+cf.id]||(cf.type==='singleselect'?'':[]); });
+  allCategoryDefs().forEach(def=>{ data[def.field]=editFormValues[def.field] ?? (def.type==='singleselect'?'':[]); });
+
   if(editingId){ data.id=editingId; await saveWord(data); const idx=WORDS.findIndex(x=>x.id===editingId); if(idx!==-1) WORDS[idx]=data; showToast('Sign updated'); }
   else { data.id='sign_'+Date.now(); await saveWord(data); WORDS.push(data); showToast('Sign added'); }
   closeEditModal();
@@ -1085,17 +957,17 @@ window.saveSign=async function(){
   if(document.getElementById('pageAdmin').classList.contains('active')) renderAdminTable();
 };
 
-/* ══ DELETE ══ */
+/* ══ DELETE SIGN ══ */
 window.openDeleteModal=function(id){ const w=WORDS.find(x=>x.id===id); if(!w) return; deletingId=id; document.getElementById('deleteSignName').textContent=`"${w.en}"`; document.getElementById('deleteModal').classList.add('show'); };
 window.closeDeleteModal=function(){ document.getElementById('deleteModal').classList.remove('show'); };
 window.confirmDelete=async function(){
-  await deleteWord(deletingId); WORDS=WORDS.filter(x=>x.id!==deletingId);
+  await deleteWordDoc(deletingId); WORDS=WORDS.filter(x=>x.id!==deletingId);
   closeDeleteModal(); showToast('Sign deleted');
   buildFilterPanel(); buildHsGrid(); doFilter(); renderAdminTable();
   if(activeWord===deletingId){ activeWord=null; document.getElementById('rightPanel').innerHTML='<div class="empty-state"><i class="ti ti-hand-finger"></i><p>Select a sign from the list.</p></div>'; }
 };
 
-/* ══ OPTIONS ══ */
+/* ══ ADMIN TABS ══ */
 window.switchAdminTab=function(tab){
   ['signs','options','handshapes','feedback'].forEach(t=>{
     const k=t.charAt(0).toUpperCase()+t.slice(1);
@@ -1108,111 +980,118 @@ window.switchAdminTab=function(tab){
   if(tab==='feedback')   renderFeedbackAdmin();
 };
 
-/* ══ UNIFIED CATEGORY SYSTEM ══
-   Built-in blocks: cat, topic, diff, tag (always present)
-   Custom blocks: stored in CUSTOM_FIELDS, same card UI, multi or single select
-*/
+/* ══ CATEGORIES & TAGS PANEL (per-document model) ══ */
 function renderOptionsPanel(){
   const wrap=document.getElementById('optionsCardsWrap'); wrap.innerHTML='';
-
-  wrap.appendChild(makeOptionCard('Categories','cat',CATEGORIES,'multiselect','Multi-select on each sign.',false));
-  wrap.appendChild(makeOptionCard('Topics / Subjects','topic',TOPICS,'multiselect','Multi-select on each sign.',false));
-  wrap.appendChild(makeOptionCard('Difficulty Levels','diff',DIFFICULTIES,'singleselect','Single-select on each sign.',false));
-  wrap.appendChild(makeOptionCard('Special Tags','tag',SPECIAL_TAGS,'multiselect','Multi-select tags for filtering. Deleting a tag removes it from all signs.',false,true));
-
+  wrap.appendChild(makeBuiltinCard('Categories','categories',CATEGORIES,'multiselect','cat','Multi-select on each sign.'));
+  wrap.appendChild(makeBuiltinCard('Topics / Subjects','topics',TOPICS,'multiselect','topic','Multi-select on each sign.'));
+  wrap.appendChild(makeBuiltinCard('Difficulty Levels','difficulties',DIFFICULTIES,'singleselect','diff','Single-select on each sign.'));
+  wrap.appendChild(makeBuiltinCard('Special Tags','tags',SPECIAL_TAGS,'multiselect','tag','Multi-select tags for filtering.',true));
   CUSTOM_FIELDS.forEach(cf=>{
-    if(!cf.options) cf.options=[];
-    const card=makeOptionCard(cf.name,'cf_'+cf.id,cf.options,cf.type,(cf.type==='singleselect'?'Single-select':'Multi-select')+' — custom category.',true);
-    wrap.appendChild(card);
+    const opts=CUSTOM_OPTIONS.filter(o=>o.fieldId===cf.id);
+    wrap.appendChild(makeCustomCard(cf,opts));
   });
 }
 
-function makeOptionCard(title,key,arr,type,subtitle,isCustom,wide=false){
-  const card=document.createElement('div');
-  card.className='options-card'+(wide?'':'');
+function makeBuiltinCard(title,colName,items,type,key,subtitle,wide=false){
+  const card=document.createElement('div'); card.className='options-card';
   if(wide) card.style.gridColumn='1/-1';
-  const listId='optList_'+key;
-  const inputId='optNew_'+key;
+  const listId='blt_'+key;
   card.innerHTML=`
-    <div class="cf-card-header" style="margin-bottom:4px;">
-      <div class="options-card-title">${title} <span style="font-size:10px;color:var(--text3);font-weight:400;">${type==='singleselect'?'(single-select)':'(multi-select)'}</span></div>
-      ${isCustom?`<button class="row-btn del" onclick="deleteCustomCategory('${key}')" title="Delete this whole category"><i class="ti ti-trash"></i></button>`:''}
-    </div>
+    <div class="options-card-title">${title} <span style="font-size:10px;color:var(--text3);font-weight:400;">${type==='singleselect'?'(single-select)':'(multi-select)'}</span></div>
     <div class="options-card-sub">${subtitle}</div>
     <div class="options-list" id="${listId}" ${wide?'style="flex-direction:row;flex-wrap:wrap;max-height:none;"':''}></div>
-    <div class="options-add-row"><input type="text" id="${inputId}" placeholder="New value..." onkeydown="if(event.key==='Enter')addCategoryValue('${key}')"/><button onclick="addCategoryValue('${key}')">Add</button></div>
+    <div class="options-add-row"><input type="text" id="new_${key}" placeholder="New value..." onkeydown="if(event.key==='Enter')addBuiltinValue('${colName}','${key}')"/><button onclick="addBuiltinValue('${colName}','${key}')">Add</button></div>
   `;
-  renderCategoryValueList(listId,arr,key,wide);
+  renderValueRows(listId,items,wide,(id,val)=>renameBuiltinValue(colName,key,id,val),(id)=>deleteBuiltinValue(colName,key,id));
   return card;
 }
 
-function renderCategoryValueList(listId,arr,key,wide){
+function makeCustomCard(cf,items){
+  const card=document.createElement('div'); card.className='options-card';
+  const listId='cst_'+cf.id;
+  card.innerHTML=`
+    <div class="options-card-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>${cf.name} <span style="font-size:10px;color:var(--text3);font-weight:400;">${cf.type==='singleselect'?'(single-select)':'(multi-select)'} · custom</span></span>
+      <button class="row-btn del" onclick="deleteCustomCategory('${cf.id}')" title="Delete this category"><i class="ti ti-trash"></i></button>
+    </div>
+    <div class="options-card-sub">Custom category — appears in sign editor and filters.</div>
+    <div class="options-list" id="${listId}"></div>
+    <div class="options-add-row"><input type="text" id="newc_${cf.id}" placeholder="New value..." onkeydown="if(event.key==='Enter')addCustomValue('${cf.id}')"/><button onclick="addCustomValue('${cf.id}')">Add</button></div>
+  `;
+  renderValueRows(listId,items,false,(id,val)=>renameCustomValue(cf.id,id,val),(id)=>deleteCustomValue(cf.id,id));
+  return card;
+}
+
+function renderValueRows(listId,items,wide,onRename,onDelete){
   const el=document.getElementById(listId); if(!el) return;
   el.innerHTML='';
-  if(!arr.length){ el.innerHTML='<p style="font-size:11px;color:var(--text3);padding:4px 2px;">No options yet — add one below.</p>'; return; }
-  arr.forEach((val,i)=>{
+  if(!items.length){ el.innerHTML='<p style="font-size:11px;color:var(--text3);padding:4px 2px;">No options yet — add one below.</p>'; return; }
+  items.forEach(item=>{
     const row=document.createElement('div');
     if(wide){
       row.style.cssText='display:flex;align-items:center;gap:4px;background:var(--bg2);border:0.5px solid var(--border);border-radius:20px;padding:3px 4px 3px 10px;';
-      row.innerHTML=`<span style="font-size:12px;">${val}</span><button class="option-row-del" onclick="deleteCategoryValue('${key}',${i})" style="width:20px;height:20px;border-radius:50%;"><i class="ti ti-x" style="font-size:11px;"></i></button>`;
+      row.innerHTML=`<span style="font-size:12px;">${item.value}</span><button class="option-row-del" style="width:20px;height:20px;border-radius:50%;"><i class="ti ti-x" style="font-size:11px;"></i></button>`;
+      row.querySelector('button').onclick=()=>onDelete(item.id);
     } else {
       row.className='option-row';
-      row.innerHTML=`<input type="text" value="${val}" onchange="renameCategoryValue('${key}',${i},this.value)"/>
-        <button class="option-row-del" onclick="deleteCategoryValue('${key}',${i})"><i class="ti ti-x"></i></button>`;
+      row.innerHTML=`<input type="text" value="${item.value}"/><button class="option-row-del"><i class="ti ti-x"></i></button>`;
+      row.querySelector('input').onchange=(e)=>onRename(item.id,e.target.value);
+      row.querySelector('button').onclick=()=>onDelete(item.id);
     }
     el.appendChild(row);
   });
 }
 
-// Get the live array reference for a given key (built-in or custom)
-function getCategoryArray(key){
-  if(key==='cat')   return CATEGORIES;
-  if(key==='topic') return TOPICS;
-  if(key==='diff')  return DIFFICULTIES;
-  if(key==='tag')   return SPECIAL_TAGS;
-  if(key.startsWith('cf_')){ const cf=CUSTOM_FIELDS.find(f=>'cf_'+f.id===key); return cf?cf.options:null; }
-  return null;
-}
-
-// Get the field used on a sign object for this key (cat→w.cat, cf_xxx→w.cf_xxx)
-function fieldKeyOnSign(key){ return key==='tag' ? 'special' : key; }
-
-window.addCategoryValue=async function(key){
-  const inputId='optNew_'+key;
-  const val=document.getElementById(inputId).value.trim(); if(!val) return;
-  await refreshOptions();
-  const arr=getCategoryArray(key); if(!arr) return;
-  if(!arr.includes(val)) arr.push(val);
-  document.getElementById(inputId).value='';
-  await saveOptions();
+window.addBuiltinValue=async function(colName,key){
+  const inp=document.getElementById('new_'+key);
+  const val=inp.value.trim(); if(!val) return;
+  const arrMap={categories:CATEGORIES,topics:TOPICS,difficulties:DIFFICULTIES,tags:SPECIAL_TAGS};
+  const arr=arrMap[colName];
+  if(arr.some(x=>x.value===val)){ showToast('That value already exists.'); return; }
+  const newDoc=await addValue(colName,val); if(!newDoc) return;
+  arr.push(newDoc);
+  inp.value='';
   buildFilterPanel(); buildFilterTags(); renderOptionsPanel();
   showToast(`"${val}" added`);
 };
 
-window.renameCategoryValue=async function(key,i,newVal){
+window.renameBuiltinValue=async function(colName,key,id,newVal){
   newVal=newVal.trim(); if(!newVal) return;
-  const arr=getCategoryArray(key); if(!arr) return;
-  const oldVal=arr[i]; arr[i]=newVal;
-  const field=fieldKeyOnSign(key);
+  const arrMap={categories:CATEGORIES,topics:TOPICS,difficulties:DIFFICULTIES,tags:SPECIAL_TAGS};
+  const arr=arrMap[colName];
+  const item=arr.find(x=>x.id===id); if(!item) return;
+  const oldVal=item.value;
+  await updateValueDoc(colName,id,{value:newVal});
+  item.value=newVal;
+  const fieldMap={categories:'cat',topics:'topic',difficulties:'diff',tags:'special'};
+  const field=fieldMap[colName];
   WORDS.forEach(w=>{
     const v=w[field];
     if(Array.isArray(v)) w[field]=v.map(x=>x===oldVal?newVal:x);
     else if(v===oldVal) w[field]=newVal;
   });
-  await saveOptions(); buildFilterPanel(); doFilter(); showToast('Renamed');
+  buildFilterPanel(); doFilter();
+  showToast('Renamed');
 };
 
-window.deleteCategoryValue=async function(key,i){
-  const arr=getCategoryArray(key); if(!arr) return;
-  const removed=arr.splice(i,1)[0];
-  const field=fieldKeyOnSign(key);
+window.deleteBuiltinValue=async function(colName,key,id){
+  const arrMap={categories:CATEGORIES,topics:TOPICS,difficulties:DIFFICULTIES,tags:SPECIAL_TAGS};
+  const arr=arrMap[colName];
+  const idx=arr.findIndex(x=>x.id===id); if(idx===-1) return;
+  const removed=arr[idx].value;
+  await deleteValueDoc(colName,id);
+  arr.splice(idx,1);
+  const fieldMap={categories:'cat',topics:'topic',difficulties:'diff',tags:'special'};
+  const field=fieldMap[colName];
   WORDS.forEach(w=>{
     const v=w[field];
     if(Array.isArray(v)) w[field]=v.filter(x=>x!==removed);
     else if(v===removed) w[field]='';
   });
-  if(key==='tag') buildFilterTags();
-  await saveOptions(); buildFilterPanel(); doFilter(); renderOptionsPanel(); showToast('Deleted');
+  if(colName==='tags') buildFilterTags();
+  buildFilterPanel(); doFilter(); renderOptionsPanel();
+  showToast('Deleted');
 };
 
 window.addNewCategoryBlock=async function(){
@@ -1220,57 +1099,138 @@ window.addNewCategoryBlock=async function(){
   const type=document.getElementById('newFieldType').value;
   const optsRaw=document.getElementById('newFieldOptions').value.trim();
   if(!name){ showToast('Please enter a category name.'); return; }
-  await refreshOptions();
-  if(CUSTOM_FIELDS.find(f=>f.name===name)){ showToast('A category with that name already exists.'); return; }
-  const options = optsRaw ? optsRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
-  CUSTOM_FIELDS.push({id:'cf_'+Date.now(), name, type, options});
+  if(CUSTOM_FIELDS.some(f=>f.name.toLowerCase()===name.toLowerCase())){ showToast('A category with that name already exists.'); return; }
+  showSaving(true);
+  let fieldRef;
+  try{ fieldRef=await addDoc(collection(db,'customFields'),{name,type}); }
+  catch(err){ console.error(err); showToast('⚠ Could not create category.'); showSaving(false); return; }
+  const newField={id:fieldRef.id,name,type};
+  CUSTOM_FIELDS.push(newField);
+  const opts=optsRaw?optsRaw.split(',').map(s=>s.trim()).filter(Boolean):[];
+  for(const v of opts){
+    try{
+      const optRef=await addDoc(collection(db,'customFieldOptions'),{fieldId:newField.id,value:v});
+      CUSTOM_OPTIONS.push({id:optRef.id,fieldId:newField.id,value:v});
+    }catch(err){ console.error(err); }
+  }
+  showSaving(false);
   document.getElementById('newFieldName').value='';
   document.getElementById('newFieldOptions').value='';
-  await saveOptions();
   buildFilterPanel(); renderOptionsPanel();
-  showToast(`Category "${name}" created${options.length?` with ${options.length} option(s)`:''}`);
+  showToast(`Category "${name}" created${opts.length?` with ${opts.length} option(s)`:''}`);
 };
 
-window.deleteCustomCategory=async function(key){
-  const cf=CUSTOM_FIELDS.find(f=>'cf_'+f.id===key); if(!cf) return;
+window.deleteCustomCategory=async function(fieldId){
+  const cf=CUSTOM_FIELDS.find(f=>f.id===fieldId); if(!cf) return;
   if(!confirm(`Delete category "${cf.name}"? This removes it from all signs.`)) return;
-  CUSTOM_FIELDS=CUSTOM_FIELDS.filter(f=>f!==cf);
-  WORDS.forEach(w=>{ delete w[key]; });
-  await saveOptions();
+  showSaving(true);
+  try{
+    await deleteDoc(doc(db,'customFields',fieldId));
+    const opts=CUSTOM_OPTIONS.filter(o=>o.fieldId===fieldId);
+    for(const o of opts) await deleteDoc(doc(db,'customFieldOptions',o.id));
+  }catch(err){ console.error(err); showToast('⚠ Could not delete category.'); showSaving(false); return; }
+  showSaving(false);
+  CUSTOM_FIELDS=CUSTOM_FIELDS.filter(f=>f.id!==fieldId);
+  CUSTOM_OPTIONS=CUSTOM_OPTIONS.filter(o=>o.fieldId!==fieldId);
+  WORDS.forEach(w=>{ delete w['cf_'+fieldId]; });
   buildFilterPanel(); renderOptionsPanel();
   showToast('Category deleted');
 };
 
-window.inlineAddOption=async function(type){
+window.addCustomValue=async function(fieldId){
+  const inp=document.getElementById('newc_'+fieldId);
+  const val=inp.value.trim(); if(!val) return;
+  if(CUSTOM_OPTIONS.some(o=>o.fieldId===fieldId&&o.value===val)){ showToast('That value already exists.'); return; }
+  showSaving(true);
+  try{
+    const ref=await addDoc(collection(db,'customFieldOptions'),{fieldId,value:val});
+    CUSTOM_OPTIONS.push({id:ref.id,fieldId,value:val});
+  }catch(err){ console.error(err); showToast('⚠ Could not save.'); showSaving(false); return; }
+  showSaving(false);
+  inp.value='';
+  buildFilterPanel(); renderOptionsPanel();
+  showToast(`"${val}" added`);
+};
+
+window.renameCustomValue=async function(fieldId,optId,newVal){
+  newVal=newVal.trim(); if(!newVal) return;
+  const opt=CUSTOM_OPTIONS.find(o=>o.id===optId); if(!opt) return;
+  const oldVal=opt.value;
+  await updateValueDoc('customFieldOptions',optId,{value:newVal});
+  opt.value=newVal;
+  const field='cf_'+fieldId;
+  WORDS.forEach(w=>{
+    const v=w[field];
+    if(Array.isArray(v)) w[field]=v.map(x=>x===oldVal?newVal:x);
+    else if(v===oldVal) w[field]=newVal;
+  });
+  buildFilterPanel(); doFilter();
+  showToast('Renamed');
+};
+
+window.deleteCustomValue=async function(fieldId,optId){
+  const idx=CUSTOM_OPTIONS.findIndex(o=>o.id===optId); if(idx===-1) return;
+  const removed=CUSTOM_OPTIONS[idx].value;
+  await deleteValueDoc('customFieldOptions',optId);
+  CUSTOM_OPTIONS.splice(idx,1);
+  const field='cf_'+fieldId;
+  WORDS.forEach(w=>{
+    const v=w[field];
+    if(Array.isArray(v)) w[field]=v.filter(x=>x!==removed);
+    else if(v===removed) w[field]='';
+  });
+  buildFilterPanel(); doFilter(); renderOptionsPanel();
+  showToast('Deleted');
+};
+
+/* ══ INLINE + BUTTONS (from inside Edit modal) ══ */
+window.inlineAddBuiltin=async function(key){
   const labels={cat:'category',topic:'topic',diff:'difficulty',tag:'tag',hand:'handshape'};
-  const val=prompt(`New ${labels[type]||type}:`); if(!val?.trim()) return;
+  const val=prompt(`New ${labels[key]||key}:`); if(!val?.trim()) return;
   const v=val.trim();
-  await refreshOptions();
-  if(type==='cat'  &&!CATEGORIES.includes(v))  CATEGORIES.push(v);
-  if(type==='topic'&&!TOPICS.includes(v))       TOPICS.push(v);
-  if(type==='diff' &&!DIFFICULTIES.includes(v)) DIFFICULTIES.push(v);
-  if(type==='tag'  &&!SPECIAL_TAGS.includes(v)) SPECIAL_TAGS.push(v);
-  if(type==='hand' &&!HANDSHAPES.includes(v))   HANDSHAPES.push(v);
-  await saveOptions(); buildFilterPanel(); buildFilterTags(); buildModalChips(WORDS.find(x=>x.id===editingId)||{});
+  const colMap={cat:'categories',topic:'topics',diff:'difficulties',tag:'tags',hand:'handshapes'};
+  const arrMap={cat:CATEGORIES,topic:TOPICS,diff:DIFFICULTIES,tag:SPECIAL_TAGS,hand:HANDSHAPES};
+  const colName=colMap[key], arr=arrMap[key];
+  if(arr.some(x=>x.value===v)){ showToast('That value already exists.'); return; }
+  const newDoc=await addValue(colName,v); if(!newDoc) return;
+  arr.push(newDoc);
+  buildFilterPanel(); buildFilterTags();
+  if(key==='hand') buildHsGrid();
+  buildModalFields(WORDS.find(x=>x.id===editingId)||{});
   showToast(`"${v}" added`);
 };
 
-/* ══ HANDSHAPE MANAGE ══ */
+window.inlineAddCustom=async function(fieldId){
+  const val=prompt('New option:'); if(!val?.trim()) return;
+  const v=val.trim();
+  if(CUSTOM_OPTIONS.some(o=>o.fieldId===fieldId&&o.value===v)){ showToast('That value already exists.'); return; }
+  showSaving(true);
+  try{
+    const ref=await addDoc(collection(db,'customFieldOptions'),{fieldId,value:v});
+    CUSTOM_OPTIONS.push({id:ref.id,fieldId,value:v});
+  }catch(err){ console.error(err); showToast('⚠ Could not save.'); showSaving(false); return; }
+  showSaving(false);
+  buildFilterPanel();
+  buildModalFields(WORDS.find(x=>x.id===editingId)||{});
+  showToast(`"${v}" added`);
+};
+
+/* ══ HANDSHAPE IMAGE MANAGEMENT ══ */
 function renderHsMgGrid(){
   const grid=document.getElementById('hsMgGrid'); grid.innerHTML='';
-  HANDSHAPES.forEach(l=>{
+  HANDSHAPES.forEach(h=>{
     const cell=document.createElement('div'); cell.className='hs-manage-cell';
     const preview=document.createElement('div'); preview.className='hs-manage-preview';
-    if(hsImageMap[l]){ const img=document.createElement('img'); img.src=hsImageMap[l]; img.alt=l; preview.appendChild(img); }
-    else { const sp=document.createElement('span'); sp.className='hs-manage-letter'; sp.textContent=l; preview.appendChild(sp); }
+    if(h.image){ const img=document.createElement('img'); img.src=h.image; img.alt=h.value; preview.appendChild(img); }
+    else { const sp=document.createElement('span'); sp.className='hs-manage-letter'; sp.textContent=h.value; preview.appendChild(sp); }
     cell.appendChild(preview);
-    const lbl=document.createElement('div'); lbl.className='hs-manage-lbl'; lbl.textContent=l; cell.appendChild(lbl);
+    const lbl=document.createElement('div'); lbl.className='hs-manage-lbl'; lbl.textContent=h.value; cell.appendChild(lbl);
     const ul=document.createElement('label'); ul.className='hs-manage-upload';
-    ul.innerHTML=`<i class="ti ti-upload" style="font-size:11px;margin-right:3px;"></i>${hsImageMap[l]?'Replace':'Upload'}`;
+    ul.innerHTML=`<i class="ti ti-upload" style="font-size:11px;margin-right:3px;"></i>${h.image?'Replace':'Upload'}`;
     const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.style.display='none';
-    inp.onchange=async e=>{ const f=e.target.files[0]; if(!f) return; hsImageMap[l]=await fileToB64(f); await saveOptions(); buildHsGrid(); renderHsMgGrid(); showToast(`Handshape ${l} updated`); };
+    inp.onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const b64=await fileToB64(f); await updateValueDoc('handshapes',h.id,{image:b64}); h.image=b64; buildHsGrid(); renderHsMgGrid(); showToast(`Handshape ${h.value} updated`); };
     ul.appendChild(inp); cell.appendChild(ul);
-    if(hsImageMap[l]){ const db2=document.createElement('button'); db2.className='hs-manage-del'; db2.innerHTML='<i class="ti ti-trash" style="font-size:11px;margin-right:2px;"></i>Remove'; db2.onclick=async()=>{ delete hsImageMap[l]; await saveOptions(); buildHsGrid(); renderHsMgGrid(); showToast('Image removed'); }; cell.appendChild(db2); }
+    if(h.image){ const db2=document.createElement('button'); db2.className='hs-manage-del'; db2.innerHTML='<i class="ti ti-trash" style="font-size:11px;margin-right:2px;"></i>Remove'; db2.onclick=async()=>{ await updateValueDoc('handshapes',h.id,{image:''}); delete h.image; buildHsGrid(); renderHsMgGrid(); showToast('Image removed'); }; cell.appendChild(db2); }
     grid.appendChild(cell);
   });
 }
@@ -1278,9 +1238,12 @@ function renderHsMgGrid(){
 window.addHandshape=async function(){
   const inp=document.getElementById('newHsInput');
   const v=inp.value.trim().toUpperCase(); if(!v) return;
-  if(HANDSHAPES.includes(v)){ showToast(`"${v}" already exists`); return; }
-  HANDSHAPES.push(v); inp.value='';
-  await saveOptions(); buildHsGrid(); renderHsMgGrid(); buildFilterPanel(); showToast(`Handshape "${v}" added`);
+  if(HANDSHAPES.some(h=>h.value===v)){ showToast(`"${v}" already exists`); return; }
+  const newDoc=await addValue('handshapes',v); if(!newDoc) return;
+  HANDSHAPES.push(newDoc);
+  inp.value='';
+  buildHsGrid(); renderHsMgGrid(); buildFilterPanel();
+  showToast(`Handshape "${v}" added`);
 };
 
 /* ══ FEEDBACK ADMIN ══ */
@@ -1288,11 +1251,7 @@ window.renderFeedbackAdmin=async function(){
   await loadFeedback();
   const typeF=document.getElementById('fbFilterType')?.value||'';
   const starF=document.getElementById('fbFilterStars')?.value||'';
-  const list=FEEDBACKS.filter(f=>{
-    if(typeF&&f.type!==typeF) return false;
-    if(starF&&String(f.rating)!==starF) return false;
-    return true;
-  });
+  const list=FEEDBACKS.filter(f=>{ if(typeF&&f.type!==typeF) return false; if(starF&&String(f.rating)!==starF) return false; return true; });
   const el=document.getElementById('fbAdminList');
   if(!list.length){ el.innerHTML='<p style="color:var(--text3);font-size:13px;">No feedback yet.</p>'; return; }
   el.innerHTML=list.map(f=>{
@@ -1310,22 +1269,18 @@ window.renderFeedbackAdmin=async function(){
     </div>`;
   }).join('');
 };
-
-window.deleteFeedback=async function(id){
-  await deleteDoc(doc(db,'feedback',id));
-  showToast('Feedback deleted');
-  renderFeedbackAdmin();
-};
+window.deleteFeedback=async function(id){ await deleteDoc(doc(db,'feedback',id)); showToast('Feedback deleted'); renderFeedbackAdmin(); };
 
 /* ══ TOAST ══ */
 let toastTimer;
-window.showToast=function(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2400); };
+window.showToast=function(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2600); };
 
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeFsModal(); closeEditModal(); closeDeleteModal(); } });
 
 /* ══ INIT ══ */
 async function init(){
-  try{ await loadAll(); } catch(e){ console.error(e); showToast('⚠ Firebase connection error. Check your config.'); }
+  try{ await loadAll(); }
+  catch(e){ console.error(e); showToast('⚠ Firebase connection error. Check your config and Firestore rules.'); }
   document.getElementById('appLoading').style.display='none';
   document.getElementById('mainHeader').style.display='flex';
   buildFilterPanel(); buildFilterTags(); buildHsGrid(); doFilter();
