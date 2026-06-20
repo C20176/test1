@@ -6,33 +6,7 @@
 <title>SignBiz — Business Sign Language Dictionary</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
 <!--
-╔══════════════════════════════════════════════════════════════════╗
-║  SIGNBIZ SETUP — fresh rebuild with per-document data model      ║
-╠══════════════════════════════════════════════════════════════════╣
-║  1. Paste your Firebase config in the firebaseConfig block       ║
-║  2. Firestore Security Rules — paste EXACTLY in Firebase         ║
-║     Console → Firestore Database → Rules → Publish:              ║
-║                                                                    ║
-║   rules_version = '2';                                           ║
-║   service cloud.firestore {                                      ║
-║     match /databases/{database}/documents {                      ║
-║       match /signs/{id}            { allow read: if true; allow write: if request.auth != null; } ║
-║       match /categories/{id}       { allow read: if true; allow write: if request.auth != null; } ║
-║       match /topics/{id}           { allow read: if true; allow write: if request.auth != null; } ║
-║       match /difficulties/{id}     { allow read: if true; allow write: if request.auth != null; } ║
-║       match /tags/{id}             { allow read: if true; allow write: if request.auth != null; } ║
-║       match /handshapes/{id}       { allow read: if true; allow write: if request.auth != null; } ║
-║       match /customFields/{id}     { allow read: if true; allow write: if request.auth != null; } ║
-║       match /customFieldOptions/{id} { allow read: if true; allow write: if request.auth != null; } ║
-║       match /feedback/{id}         { allow create: if true; allow read, update, delete: if request.auth != null; } ║
-║     }                                                             ║
-║   }                                                               ║
-║                                                                    ║
-║  WHY THIS STRUCTURE: every category value (e.g. "Greetings",     ║
-║  "Book") is its OWN Firestore document instead of one big array. ║
-║  This means adding/editing/deleting one value never overwrites   ║
-║  anyone else's changes — no more data loss from race conditions. ║
-╚══════════════════════════════════════════════════════════════════╝
+
 -->
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -163,6 +137,27 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .fb-submit{font-size:12px;padding:6px 16px;border-radius:var(--r-md);border:0.5px solid var(--accent);background:var(--accent);color:white;cursor:pointer;}
 .fb-submit:hover{background:var(--accent2);}
 .fb-success{font-size:12px;color:var(--success);display:none;align-items:center;gap:5px;}
+.fb-avg-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+.fb-avg-stars{color:#F59E0B;font-size:16px;letter-spacing:1px;}
+.fb-avg-num{font-size:14px;font-weight:600;color:var(--text);}
+.fb-avg-count{font-size:12px;color:var(--text3);}
+.fb-comment-list{display:flex;flex-direction:column;gap:10px;margin-top:14px;}
+.fb-comment{background:var(--bg2);border-radius:var(--r-md);padding:10px 12px;}
+.fb-comment-header{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;}
+.fb-comment-name{font-size:12px;font-weight:600;color:var(--text);}
+.fb-comment-stars{color:#F59E0B;font-size:11px;}
+.fb-comment-date{font-size:11px;color:var(--text3);}
+.fb-comment-text{font-size:13px;color:var(--text2);line-height:1.55;}
+.fb-team-reply{margin-top:8px;margin-left:14px;padding:8px 10px;background:var(--accent-light);border-radius:var(--r-md);border-left:3px solid var(--accent);}
+.fb-team-reply-header{font-size:11px;font-weight:600;color:var(--accent);margin-bottom:3px;}
+.fb-team-reply-text{font-size:12px;color:var(--text2);}
+.fb-comment-actions{display:flex;gap:6px;margin-top:6px;}
+.fb-mini-btn{font-size:10px;padding:2px 8px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer;}
+.fb-mini-btn:hover{background:var(--bg2);}
+.fb-mini-btn.danger:hover{background:var(--danger-light);color:var(--danger);border-color:var(--danger);}
+.fb-guest-login{background:var(--bg2);border:0.5px dashed var(--border2);border-radius:var(--r-md);padding:14px;text-align:center;}
+.fb-guest-login p{font-size:12px;color:var(--text2);margin-bottom:10px;}
+.fb-privacy-note{font-size:11px;color:var(--text3);margin-top:6px;line-height:1.5;}
 .admin-header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;}
 .admin-title{font-size:18px;font-weight:500;}
 .admin-sub{font-size:12px;color:var(--text2);margin-top:2px;}
@@ -205,7 +200,10 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .cf-new-row .form-field{margin-bottom:0;flex:1;}
 .hs-manage-wrap{padding:20px 24px;}
 .hs-manage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:10px;}
-.hs-manage-cell{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-md);padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.hs-manage-cell{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-md);padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:grab;transition:transform 0.12s, box-shadow 0.12s;}
+.hs-manage-cell.dragging{opacity:0.4;cursor:grabbing;}
+.hs-manage-cell.drag-over{box-shadow:0 0 0 2px var(--accent);transform:scale(1.03);}
+.hs-manage-drag-handle{font-size:10px;color:var(--text3);display:flex;align-items:center;gap:2px;user-select:none;}
 .hs-manage-preview{width:60px;height:60px;border-radius:var(--r-sm);border:0.5px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg2);}
 .hs-manage-preview img{width:100%;height:100%;object-fit:cover;}
 .hs-manage-letter{font-size:22px;font-weight:600;color:var(--text3);}
@@ -454,7 +452,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 <div class="toast" id="toast"></div>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, addDoc, query, orderBy, onSnapshot }
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, addDoc, query, orderBy, onSnapshot }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
@@ -462,6 +460,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopu
 /* ══════════════════════════════════════
    🔧 PASTE YOUR FIREBASE CONFIG HERE
 ══════════════════════════════════════ */
+
 const firebaseConfig = {
   apiKey: "AIzaSyA2XCR3FVzYa0ScuR8u7KQUW_cEQePyTvo",
   authDomain: "biztest-58d18.firebaseapp.com",
@@ -498,6 +497,8 @@ let activeAZ=null, activeSpecial=[], activeWord=null, activeVideoType='how';
 let editingId=null, deletingId=null, editFormSpecial=[], editFormValues={};
 let currentLang='en', currentUser=null;
 let fbRating=0, fbType='';
+let feedbackBySign={}; // signId → array of feedback docs (cached after first load per sign)
+let isAdmin=false; // determined by checking admins/{email} collection after login
 
 const CAT_C={"_default":["#F1EFE8","#444441"]};
 const PALETTE=[["#EEEDFE","#534AB7"],["#E1F5EE","#0F6E56"],["#FAEEDA","#854F0B"],["#FAECE7","#993C1D"],["#E6F1FB","#185FA5"],["#EAF3DE","#3B6D11"],["#F1EFE8","#5F5E5A"]];
@@ -531,6 +532,16 @@ async function loadAll(){
 
   // Seed built-in defaults ONLY if completely empty (first run)
   if(!CATEGORIES.length) await seedDefaults();
+
+  sortHandshapes();
+}
+
+function sortHandshapes(){
+  HANDSHAPES.sort((a,b)=>{
+    const oa = (typeof a.order==='number') ? a.order : 9999;
+    const ob = (typeof b.order==='number') ? b.order : 9999;
+    return oa-ob;
+  });
 }
 
 async function seedDefaults(){
@@ -543,7 +554,7 @@ async function seedDefaults(){
   for(const v of tops)  await addDoc(collection(db,'topics'),{value:v});
   for(const v of diffs) await addDoc(collection(db,'difficulties'),{value:v});
   for(const v of tags)  await addDoc(collection(db,'tags'),{value:v});
-  for(const v of hands) await addDoc(collection(db,'handshapes'),{value:v});
+  for(let i=0;i<hands.length;i++) await addDoc(collection(db,'handshapes'),{value:hands[i],order:i});
   CATEGORIES   = await loadCollection('categories');
   TOPICS       = await loadCollection('topics');
   DIFFICULTIES = await loadCollection('difficulties');
@@ -591,6 +602,17 @@ async function loadFeedback(){
   }catch(err){ console.error('loadFeedback failed (check Firestore rules):', err); FEEDBACKS=[]; }
 }
 
+// Load feedback for one sign (ratings always loaded for average; comments shown
+// only if isPublic, except admins see everything)
+async function loadFeedbackForSign(signId){
+  try{
+    const snap = await getDocs(query(collection(db,'feedback'), orderBy('ts','desc')));
+    const all = snap.docs.map(d=>({id:d.id,...d.data()})).filter(f=>f.signId===signId);
+    feedbackBySign[signId]=all;
+    return all;
+  }catch(err){ console.error('loadFeedbackForSign failed:',err); feedbackBySign[signId]=[]; return []; }
+}
+
 /* ══ AUTH ══ */
 window.loginEmail_pw=async function(){
   const e=document.getElementById('loginEmail').value.trim(), p=document.getElementById('loginPassword').value;
@@ -599,26 +621,47 @@ window.loginEmail_pw=async function(){
 };
 window.loginGoogle=async function(){ try{ await signInWithPopup(auth,gp); }catch(ex){ showToast('Google error: '+ex.message); } };
 window.cancelLogin=function(){ showPage('dict'); };
-window.doLogout=async function(){ await signOut(auth); showToast('Signed out'); };
+window.doLogout=async function(){ await signOut(auth); isAdmin=false; showToast('Signed out'); };
 
-onAuthStateChanged(auth, user=>{
+// Lightweight Google sign-in used from inside the comment box (not the admin login page)
+window.loginGoogleForComment=async function(signId){
+  try{ await signInWithPopup(auth,gp); }
+  catch(ex){ showToast('Google sign-in failed: '+ex.message); return; }
+  // After login, re-render the detail panel so the comment box updates
+  const w=WORDS.find(x=>x.id===signId); if(w) renderDetail(w);
+};
+
+async function checkIsAdmin(user){
+  if(!user||!user.email) return false;
+  try{
+    const snap=await getDoc(doc(db,'admins',user.email));
+    return snap.exists();
+  }catch(err){ console.error('Admin check failed:',err); return false; }
+}
+
+onAuthStateChanged(auth, async user=>{
   currentUser=user;
+  isAdmin = user ? await checkIsAdmin(user) : false;
   const uEl=document.getElementById('headerUser'), aBtn=document.getElementById('adminNavBtn'),
         lBtn=document.getElementById('loginNavBtn'), oBtn=document.getElementById('logoutBtn');
   if(user){
     uEl.style.display='flex';
     uEl.innerHTML=user.photoURL?`<img src="${user.photoURL}"/><span>${user.displayName||user.email}</span>`:`<i class="ti ti-user-circle"></i><span>${user.email}</span>`;
-    aBtn.style.display='flex'; lBtn.style.display='none'; oBtn.style.display='flex';
+    aBtn.style.display=isAdmin?'flex':'none';
+    lBtn.style.display='none'; oBtn.style.display='flex';
     if(document.getElementById('pageLogin').classList.contains('active')) showPage('dict');
   } else {
     uEl.style.display='none'; aBtn.style.display='none'; lBtn.style.display='flex'; oBtn.style.display='none';
     if(document.getElementById('pageAdmin').classList.contains('active')) showPage('dict');
   }
+  // Refresh detail panel (feedback box depends on login state) and admin tables
+  if(activeWord){ const w=WORDS.find(x=>x.id===activeWord); if(w) renderDetail(w); }
+  if(document.getElementById('pageAdmin').classList.contains('active')) renderAdminTable();
 });
 
 /* ══ PAGE ROUTING ══ */
 window.showPage=function(p){
-  if(p==='admin'&&!currentUser){ showPage('login'); return; }
+  if(p==='admin'&&!isAdmin){ showPage('login'); return; }
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   if(p==='login'){ document.getElementById('pageLogin').classList.add('active'); }
@@ -757,7 +800,14 @@ window.resetFilters=function(){
 window.toggleAdv=function(){ document.getElementById('advPanel').classList.toggle('show'); document.getElementById('advToggle').classList.toggle('open'); };
 
 /* ══ DETAIL VIEW ══ */
-window.selectWord=function(id){ const w=WORDS.find(x=>x.id===id); if(!w) return; activeWord=w.id; activeVideoType='how'; doFilter(); renderDetail(w); };
+window.selectWord=async function(id){
+  const w=WORDS.find(x=>x.id===id); if(!w) return;
+  activeWord=w.id; activeVideoType='how';
+  doFilter();
+  renderDetail(w); // render immediately with whatever's cached (fast UI)
+  await loadFeedbackForSign(id); // then refresh feedback async
+  if(activeWord===id) renderDetail(w); // re-render only if still viewing same sign
+};
 
 function renderDetail(w){
   const dc=DIFF_C[w.diff]||CAT_C._default;
@@ -792,20 +842,82 @@ function renderDetail(w){
       <div class="vid-tabs">${tabs}</div>
       <div class="video-box">${videoHtml}</div>
       <p class="entry-desc"><strong>How to sign:</strong> ${w.desc||''}</p>
-      <div class="feedback-wrap">
-        <div class="feedback-title"><i class="ti ti-message-circle"></i> Leave Feedback</div>
-        <div class="star-row" id="starRow_${w.id}">
-          ${[1,2,3,4,5].map(n=>`<span class="star" onclick="setFbRating(${n},'${w.id}')" onmouseover="hoverStars(${n},'${w.id}')" onmouseout="resetStarHover('${w.id}')">★</span>`).join('')}
-        </div>
-        <div class="fb-type-row">${['Bug','Suggestion','Other'].map(t=>`<span class="fb-type" onclick="setFbType('${t}','${w.id}')">${t}</span>`).join('')}</div>
-        <textarea class="fb-textarea" id="fbText_${w.id}" placeholder="Your feedback (optional)..."></textarea>
-        <div style="display:flex;align-items:center;gap:12px;">
-          <button class="fb-submit" onclick="submitFeedback('${w.id}')">Send feedback</button>
-          <span class="fb-success" id="fbSuccess_${w.id}"><i class="ti ti-circle-check"></i> Thank you!</span>
-        </div>
+      <div class="feedback-wrap" id="feedbackWrap_${w.id}">
+        ${renderFeedbackSection(w)}
       </div>
     </div>`;
   fbRating=0; fbType='';
+}
+
+/* ══ FEEDBACK SECTION (rating average + public comments + comment box) ══ */
+function renderFeedbackSection(w){
+  const list = feedbackBySign[w.id] || [];
+  const rated = list.filter(f=>f.rating>0);
+  const avg = rated.length ? (rated.reduce((s,f)=>s+f.rating,0)/rated.length) : 0;
+  const avgRounded = Math.round(avg*10)/10;
+
+  const avgStars = avg>0
+    ? `<span class="fb-avg-stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5-Math.round(avg))}</span>
+       <span class="fb-avg-num">${avgRounded}</span>
+       <span class="fb-avg-count">(${rated.length} rating${rated.length===1?'':'s'})</span>`
+    : `<span class="fb-avg-count">No ratings yet — be the first!</span>`;
+
+  // Public comments (visible to everyone). Admins also see private ones, clearly marked.
+  const visibleComments = isAdmin ? list.filter(f=>f.text) : list.filter(f=>f.text && f.isPublic);
+  const commentsHtml = visibleComments.map(f=>{
+    const stars = f.rating ? `<span class="fb-comment-stars">${'★'.repeat(f.rating)}${'☆'.repeat(5-f.rating)}</span>` : '';
+    const date = f.ts ? new Date(f.ts).toLocaleDateString() : '';
+    const name = f.displayName || 'Anonymous';
+    const privacyBadge = !f.isPublic ? `<span class="fb-badge" style="background:var(--bg2);color:var(--text3);">Private</span>` : '';
+    const reply = f.teamReply
+      ? `<div class="fb-team-reply"><div class="fb-team-reply-header"><i class="ti ti-shield-check" style="margin-right:3px;"></i>Response from the team</div><div class="fb-team-reply-text">${f.teamReply}</div></div>`
+      : '';
+    const adminActions = isAdmin ? `
+      <div class="fb-comment-actions">
+        ${f.isPublic
+          ? `<button class="fb-mini-btn" onclick="toggleFeedbackPublic('${w.id}','${f.id}',false)"><i class="ti ti-eye-off"></i> Hide</button>`
+          : `<button class="fb-mini-btn" onclick="toggleFeedbackPublic('${w.id}','${f.id}',true)"><i class="ti ti-eye"></i> Make public</button>`}
+        <button class="fb-mini-btn" onclick="openTeamReplyPrompt('${w.id}','${f.id}')"><i class="ti ti-message-reply"></i> ${f.teamReply?'Edit reply':'Reply'}</button>
+        <button class="fb-mini-btn danger" onclick="deleteFeedback('${f.id}','${w.id}')"><i class="ti ti-trash"></i> Delete</button>
+      </div>` : '';
+    return `<div class="fb-comment">
+      <div class="fb-comment-header"><span class="fb-comment-name">${name}</span>${stars}${privacyBadge}<span class="fb-comment-date">${date}</span></div>
+      <div class="fb-comment-text">${f.text}</div>
+      ${reply}
+      ${adminActions}
+    </div>`;
+  }).join('');
+
+  // Comment box: requires guest Google login (separate from admin login)
+  const isLoggedIn = !!currentUser;
+  const commentBox = isLoggedIn
+    ? `<div class="star-row" id="starRow_${w.id}">
+         ${[1,2,3,4,5].map(n=>`<span class="star" onclick="setFbRating(${n},'${w.id}')" onmouseover="hoverStars(${n},'${w.id}')" onmouseout="resetStarHover('${w.id}')">★</span>`).join('')}
+       </div>
+       <div class="fb-type-row">${['Bug','Suggestion','Other'].map(t=>`<span class="fb-type" onclick="setFbType('${t}','${w.id}')">${t}</span>`).join('')}</div>
+       <textarea class="fb-textarea" id="fbText_${w.id}" placeholder="Your feedback (optional)..."></textarea>
+       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+         <button class="fb-submit" onclick="submitFeedback('${w.id}')">Send feedback</button>
+         <span class="fb-success" id="fbSuccess_${w.id}"><i class="ti ti-circle-check"></i> Thank you!</span>
+       </div>
+       <p class="fb-privacy-note"><i class="ti ti-lock" style="margin-right:3px;"></i>Your comment is private by default. Our team may choose to make helpful comments public for discussion. Only your name and comment are ever shown — never your email.</p>`
+    : `<div class="fb-guest-login">
+         <p>Rate this sign with stars right away, or sign in with Google to leave a written comment.</p>
+         <div class="star-row" id="starRow_${w.id}" style="justify-content:center;">
+           ${[1,2,3,4,5].map(n=>`<span class="star" onclick="quickRate(${n},'${w.id}')">★</span>`).join('')}
+         </div>
+         <button class="google-btn" style="margin-top:8px;" onclick="loginGoogleForComment('${w.id}')">
+           <svg viewBox="0 0 24 24" width="16" height="16"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+           Sign in with Google to comment
+         </button>
+       </div>`;
+
+  return `
+    <div class="feedback-title"><i class="ti ti-message-circle"></i> Feedback</div>
+    <div class="fb-avg-row">${avgStars}</div>
+    ${commentBox}
+    ${commentsHtml ? `<div class="fb-comment-list">${commentsHtml}</div>` : ''}
+  `;
 }
 
 window.switchVideoTab=function(wId,type){ const w=WORDS.find(x=>x.id===wId); if(!w) return; activeVideoType=type; renderDetail(w); };
@@ -820,11 +932,20 @@ function updateStars(n,wId){ document.querySelectorAll(`#starRow_${wId} .star`).
 window.setFbType=function(t,wId){ fbType=t; document.querySelectorAll('#rightPanel .fb-type').forEach(el=>el.classList.toggle('on',el.textContent===t)); };
 
 window.submitFeedback=async function(wId){
+  if(!currentUser){ showToast('Please sign in with Google to comment.'); return; }
   const text=document.getElementById(`fbText_${wId}`)?.value.trim()||'';
   if(!fbRating&&!text){ showToast('Please add a rating or comment.'); return; }
   const w=WORDS.find(x=>x.id===wId);
+  const displayName=currentUser.displayName||'Anonymous';
   try{
-    await addDoc(collection(db,'feedback'),{ signId:wId, signName:w?.en||'', rating:fbRating, type:fbType||'Other', text, ts:Date.now() });
+    await addDoc(collection(db,'feedback'),{
+      signId:wId, signName:w?.en||'',
+      rating:fbRating, type:fbType||'Other', text,
+      displayName, // name only — email intentionally NOT stored
+      isPublic:false, // private by default; admin can make public
+      teamReply:'',
+      ts:Date.now()
+    });
   }catch(err){
     console.error('Feedback submit failed:',err);
     showToast('⚠ Could not send feedback — please try again later.');
@@ -835,7 +956,50 @@ window.submitFeedback=async function(wId){
   document.getElementById(`fbText_${wId}`).value='';
   fbRating=0; fbType=''; updateStars(0,wId);
   document.querySelectorAll('#rightPanel .fb-type').forEach(el=>el.classList.remove('on'));
-  showToast('Feedback submitted!');
+  await loadFeedbackForSign(wId);
+  if(activeWord===wId) renderDetail(w);
+  showToast('Feedback submitted — thank you!');
+};
+
+// Quick star-only rating for guests who aren't signed in (no comment, no name needed)
+window.quickRate=async function(n,wId){
+  const w=WORDS.find(x=>x.id===wId);
+  try{
+    await addDoc(collection(db,'feedback'),{ signId:wId, signName:w?.en||'', rating:n, type:'Other', text:'', displayName:'', isPublic:false, teamReply:'', ts:Date.now() });
+  }catch(err){
+    console.error('Quick rate failed:',err);
+    showToast('⚠ Could not save rating — please try again later.');
+    return;
+  }
+  await loadFeedbackForSign(wId);
+  if(activeWord===wId) renderDetail(w);
+  showToast('Thanks for rating!');
+};
+
+/* ══ ADMIN FEEDBACK MODERATION (on the sign detail panel) ══ */
+window.toggleFeedbackPublic=async function(signId,feedbackId,makePublic){
+  showSaving(true);
+  try{ await setDoc(doc(db,'feedback',feedbackId),{isPublic:makePublic},{merge:true}); }
+  catch(err){ console.error(err); showToast('⚠ Could not update.'); showSaving(false); return; }
+  showSaving(false);
+  const list=feedbackBySign[signId]||[];
+  const item=list.find(f=>f.id===feedbackId); if(item) item.isPublic=makePublic;
+  const w=WORDS.find(x=>x.id===signId); if(w) renderDetail(w);
+  showToast(makePublic?'Comment made public':'Comment hidden');
+};
+
+window.openTeamReplyPrompt=async function(signId,feedbackId){
+  const list=feedbackBySign[signId]||[];
+  const item=list.find(f=>f.id===feedbackId); if(!item) return;
+  const val=prompt('Response from the team:', item.teamReply||'');
+  if(val===null) return;
+  showSaving(true);
+  try{ await setDoc(doc(db,'feedback',feedbackId),{teamReply:val.trim()},{merge:true}); }
+  catch(err){ console.error(err); showToast('⚠ Could not save reply.'); showSaving(false); return; }
+  showSaving(false);
+  item.teamReply=val.trim();
+  const w=WORDS.find(x=>x.id===signId); if(w) renderDetail(w);
+  showToast('Reply saved');
 };
 
 /* ══ ADMIN: SIGNS TABLE ══ */
@@ -1247,8 +1411,10 @@ window.inlineAddCustom=async function(fieldId){
 /* ══ HANDSHAPE IMAGE MANAGEMENT ══ */
 function renderHsMgGrid(){
   const grid=document.getElementById('hsMgGrid'); grid.innerHTML='';
+  let dragSrcId=null;
   HANDSHAPES.forEach(h=>{
-    const cell=document.createElement('div'); cell.className='hs-manage-cell';
+    const cell=document.createElement('div'); cell.className='hs-manage-cell'; cell.draggable=true; cell.dataset.id=h.id;
+    const handle=document.createElement('div'); handle.className='hs-manage-drag-handle'; handle.innerHTML='<i class="ti ti-grip-vertical"></i> drag to reorder'; cell.appendChild(handle);
     const preview=document.createElement('div'); preview.className='hs-manage-preview';
     if(h.image){ const img=document.createElement('img'); img.src=h.image; img.alt=h.value; preview.appendChild(img); }
     else { const sp=document.createElement('span'); sp.className='hs-manage-letter'; sp.textContent=h.value; preview.appendChild(sp); }
@@ -1268,8 +1434,39 @@ function renderHsMgGrid(){
     delHs.innerHTML='<i class="ti ti-trash" style="font-size:11px;margin-right:2px;"></i>Delete';
     delHs.onclick=()=>openDeleteHandshapeConfirm(h.id,h.value);
     cell.appendChild(delHs);
+
+    cell.addEventListener('dragstart', e=>{ dragSrcId=h.id; cell.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+    cell.addEventListener('dragend', ()=>{ cell.classList.remove('dragging'); grid.querySelectorAll('.hs-manage-cell').forEach(c=>c.classList.remove('drag-over')); });
+    cell.addEventListener('dragover', e=>{ e.preventDefault(); if(h.id!==dragSrcId) cell.classList.add('drag-over'); });
+    cell.addEventListener('dragleave', ()=>{ cell.classList.remove('drag-over'); });
+    cell.addEventListener('drop', async e=>{
+      e.preventDefault(); cell.classList.remove('drag-over');
+      if(!dragSrcId || dragSrcId===h.id) return;
+      await reorderHandshapes(dragSrcId, h.id);
+    });
+
     grid.appendChild(cell);
   });
+}
+
+// Move dragId to just before targetId in HANDSHAPES, persist new order to Firestore
+async function reorderHandshapes(dragId, targetId){
+  const srcIdx=HANDSHAPES.findIndex(h=>h.id===dragId);
+  const tgtIdx=HANDSHAPES.findIndex(h=>h.id===targetId);
+  if(srcIdx===-1||tgtIdx===-1) return;
+  const [moved]=HANDSHAPES.splice(srcIdx,1);
+  const newTgtIdx=HANDSHAPES.findIndex(h=>h.id===targetId);
+  HANDSHAPES.splice(newTgtIdx,0,moved);
+  // Persist sequential order values for all handshapes
+  showSaving(true);
+  try{
+    for(let i=0;i<HANDSHAPES.length;i++){
+      HANDSHAPES[i].order=i;
+      await updateValueDoc('handshapes',HANDSHAPES[i].id,{order:i});
+    }
+  }catch(err){ console.error(err); showToast('⚠ Could not save new order.'); }
+  showSaving(false);
+  buildHsGrid(); renderHsMgGrid(); buildFilterPanel();
 }
 
 let pendingDeleteHsId=null;
@@ -1300,7 +1497,8 @@ window.addHandshape=async function(){
   const inp=document.getElementById('newHsInput');
   const v=inp.value.trim().toUpperCase(); if(!v) return;
   if(HANDSHAPES.some(h=>h.value===v)){ showToast(`"${v}" already exists`); return; }
-  const newDoc=await addValue('handshapes',v); if(!newDoc) return;
+  const maxOrder=HANDSHAPES.reduce((m,h)=>typeof h.order==='number'?Math.max(m,h.order):m,-1);
+  const newDoc=await addValue('handshapes',v,{order:maxOrder+1}); if(!newDoc) return;
   HANDSHAPES.push(newDoc);
   inp.value='';
   buildHsGrid(); renderHsMgGrid(); buildFilterPanel();
@@ -1316,21 +1514,39 @@ window.renderFeedbackAdmin=async function(){
   const el=document.getElementById('fbAdminList');
   if(!list.length){ el.innerHTML='<p style="color:var(--text3);font-size:13px;">No feedback yet.</p>'; return; }
   el.innerHTML=list.map(f=>{
-    const stars='★'.repeat(f.rating||0)+'☆'.repeat(5-(f.rating||0));
-    const date=f.ts?new Date(f.ts).toLocaleDateString():'';
+    const stars=f.rating?('★'.repeat(f.rating)+'☆'.repeat(5-f.rating)):'';
+    const date=f.ts?new Date(f.ts).toLocaleString():'';
+    const name=f.displayName||'Anonymous (quick rating)';
+    const pubBadge=f.text ? (f.isPublic?`<span class="fb-badge" style="background:var(--success-light);color:var(--success);">Public</span>`:`<span class="fb-badge">Private</span>`) : '';
+    const reply=f.teamReply?`<div class="fb-team-reply"><div class="fb-team-reply-header"><i class="ti ti-shield-check" style="margin-right:3px;"></i>Response from the team</div><div class="fb-team-reply-text">${f.teamReply}</div></div>`:'';
     return `<div class="fb-card">
       <div class="fb-card-header">
-        <span class="fb-stars">${stars}</span>
+        <span style="font-size:12px;font-weight:600;">${name}</span>
+        ${stars?`<span class="fb-stars">${stars}</span>`:''}
         <span class="fb-badge">${f.type||'Other'}</span>
+        ${pubBadge}
         ${f.signName?`<span class="fb-sign-ref">Re: ${f.signName}</span>`:'<span class="fb-sign-ref">General</span>'}
         <button class="fb-del-btn" onclick="deleteFeedback('${f.id}')"><i class="ti ti-trash"></i></button>
       </div>
       ${f.text?`<p class="fb-card-text">${f.text}</p>`:''}
+      ${reply}
+      <div class="row-actions" style="margin-top:8px;">
+        ${f.text ? (f.isPublic
+          ? `<button class="row-btn" onclick="toggleFeedbackPublic('${f.signId}','${f.id}',false).then(renderFeedbackAdmin)"><i class="ti ti-eye-off"></i> Hide</button>`
+          : `<button class="row-btn" onclick="toggleFeedbackPublic('${f.signId}','${f.id}',true).then(renderFeedbackAdmin)"><i class="ti ti-eye"></i> Make public</button>`) : ''}
+        ${f.text ? `<button class="row-btn" onclick="openTeamReplyPrompt('${f.signId}','${f.id}').then(renderFeedbackAdmin)"><i class="ti ti-message-reply"></i> ${f.teamReply?'Edit reply':'Reply'}</button>` : ''}
+      </div>
       <p class="fb-card-meta">${date}</p>
     </div>`;
   }).join('');
 };
-window.deleteFeedback=async function(id){ await deleteDoc(doc(db,'feedback',id)); showToast('Feedback deleted'); renderFeedbackAdmin(); };
+window.deleteFeedback=async function(id,signId){
+  await deleteDoc(doc(db,'feedback',id));
+  showToast('Feedback deleted');
+  if(signId && feedbackBySign[signId]) feedbackBySign[signId]=feedbackBySign[signId].filter(f=>f.id!==id);
+  if(document.getElementById('pageAdmin').classList.contains('active')) renderFeedbackAdmin();
+  if(activeWord){ const w=WORDS.find(x=>x.id===activeWord); if(w) renderDetail(w); }
+};
 
 /* ══ TOAST ══ */
 let toastTimer;
