@@ -463,15 +463,13 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopu
    🔧 PASTE YOUR FIREBASE CONFIG HERE
 ══════════════════════════════════════ */
 const firebaseConfig = {
-  apiKey: "AIzaSyDNnpPqzk_aQpjjThQkp486l3FuyDpajQI",
-  authDomain: "biztest-afd10.firebaseapp.com",
-  projectId: "biztest-afd10",
-  storageBucket: "biztest-afd10.firebasestorage.app",
-  messagingSenderId: "146662295145",
-  appId: "1:146662295145:web:e344d2dc0b1dba4a6984f8"
+  apiKey: "AIzaSyDxfPYsdb-zPnI42wg77zYXH6PcSU-ABCw",
+  authDomain: "signbiz-2.firebaseapp.com",
+  projectId: "signbiz-2",
+  storageBucket: "signbiz-2.firebasestorage.app",
+  messagingSenderId: "871988085904",
+  appId: "1:871988085904:web:130fac847a3c7fdd328415"
 };
-
-
 /* ══════════════════════════════════════ */
 
 const app  = initializeApp(firebaseConfig);
@@ -1052,7 +1050,9 @@ window.addBuiltinValue=async function(colName,key){
   const newDoc=await addValue(colName,val); if(!newDoc) return;
   arr.push(newDoc);
   inp.value='';
-  buildFilterPanel(); buildFilterTags(); renderOptionsPanel();
+  buildFilterPanel(); buildFilterTags();
+  const wide=colName==='tags';
+  renderValueRows('blt_'+key, arr, wide, (id,v)=>renameBuiltinValue(colName,key,id,v), (id)=>deleteBuiltinValue(colName,key,id));
   showToast(`"${val}" added`);
 };
 
@@ -1090,7 +1090,9 @@ window.deleteBuiltinValue=async function(colName,key,id){
     else if(v===removed) w[field]='';
   });
   if(colName==='tags') buildFilterTags();
-  buildFilterPanel(); doFilter(); renderOptionsPanel();
+  buildFilterPanel(); doFilter();
+  const wide=colName==='tags';
+  renderValueRows('blt_'+key, arr, wide, (rid,v)=>renameBuiltinValue(colName,key,rid,v), (rid)=>deleteBuiltinValue(colName,key,rid));
   showToast('Deleted');
 };
 
@@ -1148,7 +1150,9 @@ window.addCustomValue=async function(fieldId){
   }catch(err){ console.error(err); showToast('⚠ Could not save.'); showSaving(false); return; }
   showSaving(false);
   inp.value='';
-  buildFilterPanel(); renderOptionsPanel();
+  buildFilterPanel();
+  const opts=CUSTOM_OPTIONS.filter(o=>o.fieldId===fieldId);
+  renderValueRows('cst_'+fieldId, opts, false, (id,v)=>renameCustomValue(fieldId,id,v), (id)=>deleteCustomValue(fieldId,id));
   showToast(`"${val}" added`);
 };
 
@@ -1179,7 +1183,9 @@ window.deleteCustomValue=async function(fieldId,optId){
     if(Array.isArray(v)) w[field]=v.filter(x=>x!==removed);
     else if(v===removed) w[field]='';
   });
-  buildFilterPanel(); doFilter(); renderOptionsPanel();
+  buildFilterPanel(); doFilter();
+  const opts=CUSTOM_OPTIONS.filter(o=>o.fieldId===fieldId);
+  renderValueRows('cst_'+fieldId, opts, false, (id,v)=>renameCustomValue(fieldId,id,v), (id)=>deleteCustomValue(fieldId,id));
   showToast('Deleted');
 };
 
