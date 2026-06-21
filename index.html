@@ -231,6 +231,12 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .fb-card-meta{font-size:11px;color:var(--text3);margin-top:6px;}
 .fb-del-btn{margin-left:auto;font-size:11px;padding:3px 8px;border-radius:var(--r-sm);border:0.5px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;}
 .fb-del-btn:hover{background:var(--danger-light);color:var(--danger);border-color:var(--danger);}
+.diff-list{display:flex;flex-direction:column;gap:5px;margin-top:8px;}
+.diff-row{display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap;background:var(--bg2);border-radius:var(--r-sm);padding:5px 9px;}
+.diff-field{font-weight:600;color:var(--text);min-width:70px;text-transform:capitalize;}
+.diff-before{color:var(--danger);text-decoration:line-through;opacity:0.75;}
+.diff-after{color:var(--success);font-weight:500;}
+.diff-row i{color:var(--text3);font-size:12px;}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
 .modal-overlay.show{display:flex;}
 .modal-box{background:var(--bg);border-radius:var(--r-lg);padding:22px;width:min(560px,92vw);max-height:90vh;overflow-y:auto;}
@@ -350,6 +356,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     <div class="admin-tab" id="atOptions" onclick="switchAdminTab('options')">Categories &amp; Tags</div>
     <div class="admin-tab" id="atHandshapes" onclick="switchAdminTab('handshapes')">Handshape Images</div>
     <div class="admin-tab" id="atFeedback" onclick="switchAdminTab('feedback')">Feedback</div>
+    <div class="admin-tab" id="atReview" style="display:none;" onclick="switchAdminTab('review')">Pending Review <span id="reviewCountBadge" class="fb-badge" style="display:none;background:var(--vexample-light);color:var(--vexample);margin-left:4px;">0</span></div>
   </div>
 
   <div class="admin-tab-panel active" id="apSigns">
@@ -395,6 +402,14 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
         <button class="btn" onclick="renderFeedbackAdmin()"><i class="ti ti-refresh"></i> Refresh</button>
       </div>
       <div id="fbAdminList"><p style="color:var(--text3);font-size:13px;">Loading feedback...</p></div>
+    </div>
+  </div>
+
+  <div class="admin-tab-panel" id="apReview">
+    <div class="fb-admin-wrap">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">Edits and deletions made by staff admins, awaiting your review. Guests already see the live result — approving just clears the flag (or finalizes the delete); rejecting rolls it back to the version shown below.</p>
+      <button class="btn" onclick="renderPendingReviewsAdmin()" style="margin-bottom:12px;"><i class="ti ti-refresh"></i> Refresh</button>
+      <div id="reviewAdminList"><p style="color:var(--text3);font-size:13px;">Loading…</p></div>
     </div>
   </div>
 </div>
@@ -459,7 +474,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     <div class="modal-title"><span>Delete sign</span><span class="modal-close-x" onclick="closeDeleteModal()"><i class="ti ti-x"></i></span></div>
     <p style="font-size:13px;color:var(--text2);margin-bottom:6px;">Are you sure you want to delete:</p>
     <p style="font-size:15px;font-weight:500;" id="deleteSignName"></p>
-    <p style="font-size:12px;color:var(--text3);margin-top:4px;">This cannot be undone.</p>
+    <p style="font-size:12px;color:var(--text3);margin-top:4px;" id="deleteModalNote">This cannot be undone.</p>
     <div class="form-footer"><button class="btn" onclick="closeDeleteModal()">Cancel</button><button class="btn btn-danger" onclick="confirmDeleteRouter()">Delete</button></div>
   </div>
 </div>
@@ -519,6 +534,8 @@ let currentLang='en', currentUser=null;
 let fbRating=0, fbType='';
 let feedbackBySign={}; // signId → array of feedback docs (cached after first load per sign)
 let isAdmin=false; // determined by checking admins/{email} collection after login
+let isMainAdmin=false; // true only if admins/{email}.role === 'main'
+let adminName=''; // display name from admins/{email}.name, falls back to email
 
 const CAT_C={"_default":["#F1EFE8","#444441"]};
 const PALETTE=[["#EEEDFE","#534AB7"],["#E1F5EE","#0F6E56"],["#FAEEDA","#854F0B"],["#FAECE7","#993C1D"],["#E6F1FB","#185FA5"],["#EAF3DE","#3B6D11"],["#F1EFE8","#5F5E5A"]];
@@ -537,8 +554,174 @@ function showSaving(on){ document.getElementById('savingIndicator').style.displa
 
 async function loadCollection(name){
   const snap = await getDocs(collection(db,name));
-  return snap.docs.map(d=>({id:d.id,...d.data()}));
+  // Items a staff admin has "deleted" are soft-hidden (_hidden:true) pending
+  // Main Admin review. Everyone (guests AND staff) works off the filtered
+  // list day-to-day; only the Pending Review tab reads the raw documents.
+  return snap.docs.map(d=>({id:d.id,...d.data()})).filter(d=>!d._hidden);
 }
+
+/* ══════════════════════════════════════
+   REVIEW QUEUE (pendingReviews collection)
+   Main Admin acts immediately, no review trail.
+   Staff edits/deletes write through right away (guests see the new
+   content instantly) but leave a "before" snapshot Main Admin can
+   approve (keep) or reject (roll back). Hard deletes by staff are
+   soft (sets _hidden:true) until Main Admin approves the real delete.
+══════════════════════════════════════ */
+let PENDING_REVIEWS=[]; // cached after loadPendingReviews(), main-admin only
+
+async function createPendingReview(colName, docId, docLabel, action, snapshotBefore, snapshotAfter){
+  const ref = await addDoc(collection(db,'pendingReviews'),{
+    collection: colName,
+    docId: String(docId),
+    docLabel: docLabel || String(docId),
+    action, // 'edit' | 'delete'
+    snapshotBefore,
+    snapshotAfter: snapshotAfter || null,
+    editedByEmail: currentUser?.email || '',
+    editedByName: adminName || currentUser?.email || '',
+    ts: Date.now(),
+    status: 'pending'
+  });
+  return ref.id;
+}
+
+// Wraps a write (create/update) to a doc. Main Admin: writes straight through,
+// no review trail. Staff: writes straight through too (so guests see the
+// change immediately) but also files a pendingReview with the prior state,
+// and stamps the doc with _pendingReviewId so the UI can show "under review".
+async function submitEditWithReview(colName, docId, docLabel, beforeData, afterData){
+  await setDoc(doc(db,colName,String(docId)), afterData, {merge:true});
+  if(isMainAdmin) return null; // main admin edits are final, no review needed
+  const reviewId = await createPendingReview(colName, docId, docLabel, 'edit', beforeData, afterData);
+  await setDoc(doc(db,colName,String(docId)), {_pendingReviewId:reviewId}, {merge:true});
+  return reviewId;
+}
+
+// Wraps a delete. Main Admin: real deleteDoc, immediate, no trail.
+// Staff: soft-hides the doc (_hidden:true) and files a pendingReview;
+// the doc is NOT actually removed until Main Admin approves.
+async function submitDeleteWithReview(colName, docId, docLabel, fullDocData){
+  if(isMainAdmin){
+    await deleteDoc(doc(db,colName,String(docId)));
+    return null;
+  }
+  const reviewId = await createPendingReview(colName, docId, docLabel, 'delete', fullDocData, null);
+  await setDoc(doc(db,colName,String(docId)), {_hidden:true, _pendingReviewId:reviewId}, {merge:true});
+  return reviewId;
+}
+
+async function loadPendingReviews(){
+  try{
+    const snap = await getDocs(query(collection(db,'pendingReviews'), orderBy('ts','desc')));
+    PENDING_REVIEWS = snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.status==='pending');
+  }catch(err){ console.error('loadPendingReviews failed:',err); PENDING_REVIEWS=[]; }
+  return PENDING_REVIEWS;
+}
+
+// Main Admin approves a staff edit/delete: the change stands as-is.
+window.approveReview=async function(reviewId){
+  const r=PENDING_REVIEWS.find(x=>x.id===reviewId); if(!r) return;
+  showSaving(true);
+  try{
+    if(r.action==='delete'){
+      await deleteDoc(doc(db,r.collection,r.docId));
+    }else{
+      await setDoc(doc(db,r.collection,r.docId),{_pendingReviewId:null},{merge:true});
+    }
+    await setDoc(doc(db,'pendingReviews',reviewId),{status:'approved'},{merge:true});
+  }catch(err){ console.error('approveReview failed:',err); showToast('⚠ Could not approve. Try again.'); showSaving(false); return; }
+  showSaving(false);
+  showToast('Approved');
+  await refreshAfterReviewAction();
+};
+
+// Main Admin rejects a staff edit/delete: roll back to the pre-change state.
+window.rejectReview=async function(reviewId){
+  const r=PENDING_REVIEWS.find(x=>x.id===reviewId); if(!r) return;
+  showSaving(true);
+  try{
+    if(r.action==='delete'){
+      // Restore the doc exactly as it was (clears _hidden and _pendingReviewId)
+      const restored={...r.snapshotBefore, _hidden:false, _pendingReviewId:null};
+      await setDoc(doc(db,r.collection,r.docId), restored);
+    }else{
+      const restored={...r.snapshotBefore, _pendingReviewId:null};
+      await setDoc(doc(db,r.collection,r.docId), restored);
+    }
+    await setDoc(doc(db,'pendingReviews',reviewId),{status:'rejected'},{merge:true});
+  }catch(err){ console.error('rejectReview failed:',err); showToast('⚠ Could not reject. Try again.'); showSaving(false); return; }
+  showSaving(false);
+  showToast('Reverted to previous version');
+  await refreshAfterReviewAction();
+};
+
+async function refreshAfterReviewAction(){
+  await loadAll();
+  await loadPendingReviews();
+  buildFilterPanel(); buildFilterTags(); buildHsGrid(); doFilter();
+  if(document.getElementById('pageAdmin').classList.contains('active')){
+    renderAdminTable();
+    if(document.getElementById('apReview')?.classList.contains('active')) renderPendingReviewsAdmin();
+  }
+  refreshReviewBadge();
+};
+
+async function refreshReviewBadge(){
+  if(!isMainAdmin) return;
+  await loadPendingReviews();
+  const badge=document.getElementById('reviewCountBadge');
+  if(!badge) return;
+  if(PENDING_REVIEWS.length){ badge.textContent=PENDING_REVIEWS.length; badge.style.display='inline'; }
+  else { badge.style.display='none'; }
+}
+
+// Renders a readable summary of what changed for an "edit" review:
+// only the fields that actually differ between before/after.
+function diffSummary(before, after){
+  const skip=new Set(['id','_pendingReviewId','_hidden']);
+  const keys=new Set([...Object.keys(before||{}), ...Object.keys(after||{})]);
+  const rows=[];
+  keys.forEach(k=>{
+    if(skip.has(k)) return;
+    const bv=JSON.stringify(before?.[k]??'');
+    const av=JSON.stringify(after?.[k]??'');
+    if(bv!==av) rows.push(`<div class="diff-row"><span class="diff-field">${k}</span><span class="diff-before">${(before?.[k]??'—')}</span><i class="ti ti-arrow-right"></i><span class="diff-after">${(after?.[k]??'—')}</span></div>`);
+  });
+  return rows.length ? rows.join('') : '<p style="font-size:12px;color:var(--text3);">No visible field differences.</p>';
+}
+
+window.renderPendingReviewsAdmin=async function(){
+  const el=document.getElementById('reviewAdminList');
+  if(el) el.innerHTML='<p style="color:var(--text3);font-size:13px;">Loading…</p>';
+  await loadPendingReviews();
+  refreshReviewBadge();
+  if(!el) return;
+  if(!PENDING_REVIEWS.length){ el.innerHTML='<p style="color:var(--text3);font-size:13px;">Nothing pending — all clear.</p>'; return; }
+  el.innerHTML=PENDING_REVIEWS.map(r=>{
+    const date=r.ts?new Date(r.ts).toLocaleString():'';
+    const actionBadge=r.action==='delete'
+      ? `<span class="fb-badge" style="background:var(--danger-light);color:var(--danger);">Delete</span>`
+      : `<span class="fb-badge" style="background:var(--vexample-light);color:var(--vexample);">Edit</span>`;
+    const body = r.action==='delete'
+      ? `<p style="font-size:12px;color:var(--text2);margin-top:6px;">Will be permanently removed from <strong>${r.collection}</strong> if approved. Currently hidden from guests and staff.</p>`
+      : `<div class="diff-list">${diffSummary(r.snapshotBefore, r.snapshotAfter)}</div>`;
+    return `<div class="fb-card">
+      <div class="fb-card-header">
+        <span style="font-size:12px;font-weight:600;">${r.docLabel}</span>
+        ${actionBadge}
+        <span class="fb-sign-ref">${r.collection}</span>
+        <span class="fb-sign-ref">by ${r.editedByName}</span>
+      </div>
+      ${body}
+      <div class="row-actions" style="margin-top:8px;">
+        <button class="row-btn" onclick="approveReview('${r.id}')"><i class="ti ti-check"></i> Approve</button>
+        <button class="row-btn del" onclick="rejectReview('${r.id}')"><i class="ti ti-rotate"></i> Reject &amp; revert</button>
+      </div>
+      <p class="fb-card-meta">${date}</p>
+    </div>`;
+  }).join('');
+};
 
 async function loadAll(){
   WORDS         = await loadCollection('signs');
@@ -588,34 +771,54 @@ async function seedDefaults(){
 }
 
 // Generic CRUD for a "simple value" collection (categories/topics/difficulties/tags/handshapes)
+// New values are never gated behind review (only edits/deletes to EXISTING data are).
 async function addValue(colName, value, extra={}){
   showSaving(true);
   try{ const ref=await addDoc(collection(db,colName),{value,...extra}); return {id:ref.id,value,...extra}; }
   catch(err){ console.error(err); showToast('⚠ Could not save. Try again.'); return null; }
   finally{ showSaving(false); }
 }
-async function updateValueDoc(colName, id, data){
+
+// data = partial fields being changed (e.g. {value:'X'} or {image:b64}).
+// label = human-readable name shown in the Pending Review queue.
+async function updateValueDoc(colName, id, data, label){
   showSaving(true);
-  try{ await setDoc(doc(db,colName,id), data, {merge:true}); }
+  try{
+    const snap = await getDoc(doc(db,colName,id));
+    const before = snap.exists() ? {id, ...snap.data()} : {id};
+    const after = {...before, ...data};
+    await submitEditWithReview(colName, id, label||before.value, before, after);
+  }
   catch(err){ console.error(err); showToast('⚠ Could not save. Try again.'); }
   finally{ showSaving(false); }
 }
-async function deleteValueDoc(colName, id){
+
+async function deleteValueDoc(colName, id, label){
   showSaving(true);
-  try{ await deleteDoc(doc(db,colName,id)); }
+  try{
+    const snap = await getDoc(doc(db,colName,id));
+    const fullData = snap.exists() ? {id, ...snap.data()} : {id};
+    await submitDeleteWithReview(colName, id, label||fullData.value, fullData);
+  }
   catch(err){ console.error(err); showToast('⚠ Could not delete. Try again.'); }
   finally{ showSaving(false); }
 }
 
 async function saveWord(w){
   showSaving(true);
-  try{ await setDoc(doc(db,'signs',String(w.id)),w); }
+  try{
+    const before = WORDS.find(x=>String(x.id)===String(w.id)) || {id:w.id};
+    await submitEditWithReview('signs', w.id, w.en||before.en, before, w);
+  }
   catch(err){ console.error(err); showToast('⚠ Could not save sign.'); }
   finally{ showSaving(false); }
 }
 async function deleteWordDoc(id){
   showSaving(true);
-  try{ await deleteDoc(doc(db,'signs',String(id))); }
+  try{
+    const fullData = WORDS.find(x=>String(x.id)===String(id)) || {id};
+    await submitDeleteWithReview('signs', id, fullData.en, fullData);
+  }
   catch(err){ console.error(err); showToast('⚠ Could not delete.'); }
   finally{ showSaving(false); }
 }
@@ -751,17 +954,21 @@ window.loginGoogleForComment=async function(signId){
   const w=WORDS.find(x=>x.id===signId); if(w) renderDetail(w);
 };
 
-async function checkIsAdmin(user){
-  if(!user||!user.email) return false;
+// Returns the admins/{email} doc data if the user is an admin, else null.
+async function checkAdminDoc(user){
+  if(!user||!user.email) return null;
   try{
     const snap=await getDoc(doc(db,'admins',user.email));
-    return snap.exists();
-  }catch(err){ console.error('Admin check failed:',err); return false; }
+    return snap.exists() ? snap.data() : null;
+  }catch(err){ console.error('Admin check failed:',err); return null; }
 }
 
 onAuthStateChanged(auth, async user=>{
   currentUser=user;
-  isAdmin = user ? await checkIsAdmin(user) : false;
+  const adminData = user ? await checkAdminDoc(user) : null;
+  isAdmin = !!adminData;
+  isMainAdmin = !!adminData && adminData.role==='main';
+  adminName = adminData?.name || user?.displayName || user?.email || '';
   await loadUserPrefs();
   const uEl=document.getElementById('headerUser'), aBtn=document.getElementById('adminNavBtn'),
         lBtn=document.getElementById('loginNavBtn'), oBtn=document.getElementById('logoutBtn');
@@ -779,6 +986,7 @@ onAuthStateChanged(auth, async user=>{
   if(activeWord){ const w=WORDS.find(x=>x.id===activeWord); if(w) renderDetail(w); }
   if(document.getElementById('pageAdmin').classList.contains('active')) renderAdminTable();
   renderAboutView();
+  if(isMainAdmin) refreshReviewBadge();
 });
 
 /* ══ PAGE ROUTING ══ */
@@ -788,7 +996,12 @@ window.showPage=function(p){
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   if(p==='login'){ document.getElementById('pageLogin').classList.add('active'); }
   else if(p==='dict'){ document.getElementById('pageDict').classList.add('active'); document.getElementById('navDict').classList.add('active'); }
-  else if(p==='admin'){ document.getElementById('pageAdmin').classList.add('active'); switchAdminTab('signs'); renderAdminTable(); }
+  else if(p==='admin'){
+    document.getElementById('pageAdmin').classList.add('active'); switchAdminTab('signs'); renderAdminTable();
+    const reviewTab=document.getElementById('atReview');
+    if(reviewTab){ reviewTab.style.display=isMainAdmin?'flex':'none'; }
+    if(isMainAdmin) refreshReviewBadge();
+  }
   else if(p==='about'){ document.getElementById('pageAbout').classList.add('active'); document.getElementById('navAbout').classList.add('active'); }
 };
 
@@ -1187,8 +1400,9 @@ function renderAdminTable(){
     const cc=cats[0]?colorFor(cats[0]):CAT_C._default;
     const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
     const dots=['how','concept','example'].map(t=>`<span class="vdot ${w['vid_'+t]?'on':'off'}" title="${VID_META[t].label}"></span>`).join('');
+    const reviewBadge=w._pendingReviewId?`<span class="fb-badge" style="background:var(--vexample-light);color:var(--vexample);margin-left:4px;" title="Edited by staff, awaiting Main Admin review">Pending review</span>`:'';
     return `<tr>
-      <td style="font-weight:500">${w.en}</td>
+      <td style="font-weight:500">${w.en}${reviewBadge}</td>
       <td style="color:var(--text2);font-style:italic">${w.es||'—'}</td>
       <td>${cats.map(c=>{const x=colorFor(c);return `<span class="pill" style="background:${x[0]};color:${x[1]};margin-right:2px;">${c}</span>`;}).join('')}</td>
       <td>${hands.map(h=>`<span class="pill" style="background:var(--accent-light);color:var(--accent);margin-right:2px;">${h}</span>`).join('')}</td>
@@ -1308,12 +1522,20 @@ window.saveSign=async function(){
 };
 
 /* ══ DELETE SIGN ══ */
+function setDeleteModalNote(){
+  const el=document.getElementById('deleteModalNote');
+  el.textContent = isMainAdmin
+    ? 'This cannot be undone.'
+    : 'This will be hidden right away and sent to Main Admin for review. It can still be restored until they approve the deletion.';
+}
+
 window.openDeleteModal=function(id){
   const w=WORDS.find(x=>x.id===id); if(!w) return;
   deletingId=id;
   document.getElementById('deleteSignName').textContent=`"${w.en}"`;
   document.querySelector('#deleteModal .modal-title span:first-child').textContent='Delete sign';
   document.getElementById('deleteModal').dataset.mode='sign';
+  setDeleteModalNote();
   document.getElementById('deleteModal').classList.add('show');
 };
 window.closeDeleteModal=function(){ document.getElementById('deleteModal').classList.remove('show'); };
@@ -1324,14 +1546,15 @@ window.confirmDeleteRouter=function(){
 };
 window.confirmDelete=async function(){
   await deleteWordDoc(deletingId); WORDS=WORDS.filter(x=>x.id!==deletingId);
-  closeDeleteModal(); showToast('Sign deleted');
+  closeDeleteModal();
+  showToast(isMainAdmin?'Sign deleted':'Sign removed — sent to Main Admin for review');
   buildFilterPanel(); buildHsGrid(); doFilter(); renderAdminTable();
   if(activeWord===deletingId){ activeWord=null; document.getElementById('rightPanel').innerHTML='<div class="empty-state"><i class="ti ti-hand-finger"></i><p>Select a sign from the list.</p></div>'; }
 };
 
 /* ══ ADMIN TABS ══ */
 window.switchAdminTab=function(tab){
-  ['signs','options','handshapes','feedback'].forEach(t=>{
+  ['signs','options','handshapes','feedback','review'].forEach(t=>{
     const k=t.charAt(0).toUpperCase()+t.slice(1);
     document.getElementById('at'+k)?.classList.toggle('active',t===tab);
     document.getElementById('ap'+k)?.classList.toggle('active',t===tab);
@@ -1340,6 +1563,7 @@ window.switchAdminTab=function(tab){
   if(tab==='options')    renderOptionsPanel();
   if(tab==='handshapes') renderHsMgGrid();
   if(tab==='feedback')   renderFeedbackAdmin();
+  if(tab==='review')     renderPendingReviewsAdmin();
 };
 
 /* ══ CATEGORIES & TAGS PANEL (per-document model) ══ */
@@ -1444,7 +1668,11 @@ window.deleteBuiltinValue=async function(colName,key,id){
   const arr=arrMap[colName];
   const idx=arr.findIndex(x=>x.id===id); if(idx===-1) return;
   const removed=arr[idx].value;
-  await deleteValueDoc(colName,id);
+  const note = isMainAdmin
+    ? 'This cannot be undone.'
+    : 'This will be hidden right away and sent to Main Admin for review.';
+  if(!confirm(`Delete "${removed}"?\n${note}`)) return;
+  await deleteValueDoc(colName,id,removed);
   arr.splice(idx,1);
   const fieldMap={categories:'cat',topics:'topic',difficulties:'diff',tags:'special'};
   const field=fieldMap[colName];
@@ -1539,7 +1767,11 @@ window.renameCustomValue=async function(fieldId,optId,newVal){
 window.deleteCustomValue=async function(fieldId,optId){
   const idx=CUSTOM_OPTIONS.findIndex(o=>o.id===optId); if(idx===-1) return;
   const removed=CUSTOM_OPTIONS[idx].value;
-  await deleteValueDoc('customFieldOptions',optId);
+  const note = isMainAdmin
+    ? 'This cannot be undone.'
+    : 'This will be hidden right away and sent to Main Admin for review.';
+  if(!confirm(`Delete "${removed}"?\n${note}`)) return;
+  await deleteValueDoc('customFieldOptions',optId,removed);
   CUSTOM_OPTIONS.splice(idx,1);
   const field='cf_'+fieldId;
   WORDS.forEach(w=>{
@@ -1627,6 +1859,13 @@ function renderHsMgGrid(){
 }
 
 // Move dragId to just before targetId in HANDSHAPES, persist new order to Firestore
+// Reordering is a display-only change with no content risk, so it bypasses
+// the review queue entirely for both Main Admin and staff — it writes straight through.
+async function updateOrderDirect(colName, id, order){
+  try{ await setDoc(doc(db,colName,id), {order}, {merge:true}); }
+  catch(err){ console.error('updateOrderDirect failed:',err); }
+}
+
 async function reorderHandshapes(dragId, targetId){
   const srcIdx=HANDSHAPES.findIndex(h=>h.id===dragId);
   const tgtIdx=HANDSHAPES.findIndex(h=>h.id===targetId);
@@ -1639,7 +1878,7 @@ async function reorderHandshapes(dragId, targetId){
   try{
     for(let i=0;i<HANDSHAPES.length;i++){
       HANDSHAPES[i].order=i;
-      await updateValueDoc('handshapes',HANDSHAPES[i].id,{order:i});
+      await updateOrderDirect('handshapes',HANDSHAPES[i].id,i);
     }
   }catch(err){ console.error(err); showToast('⚠ Could not save new order.'); }
   showSaving(false);
@@ -1652,6 +1891,7 @@ window.openDeleteHandshapeConfirm=function(id,value){
   document.getElementById('deleteSignName').textContent=`Handshape "${value}"`;
   document.querySelector('#deleteModal .modal-title span:first-child').textContent='Delete handshape';
   document.getElementById('deleteModal').dataset.mode='handshape';
+  setDeleteModalNote();
   document.getElementById('deleteModal').classList.add('show');
 };
 
@@ -1659,7 +1899,7 @@ window.confirmDeleteHandshape=async function(){
   if(!pendingDeleteHsId) return;
   const idx=HANDSHAPES.findIndex(h=>h.id===pendingDeleteHsId); if(idx===-1) return;
   const removedVal=HANDSHAPES[idx].value;
-  await deleteValueDoc('handshapes',pendingDeleteHsId);
+  await deleteValueDoc('handshapes',pendingDeleteHsId,removedVal);
   HANDSHAPES.splice(idx,1);
   // Remove this handshape from any sign that used it
   WORDS.forEach(w=>{ if(Array.isArray(w.hand)) w.hand=w.hand.filter(x=>x!==removedVal); });
@@ -1667,7 +1907,7 @@ window.confirmDeleteHandshape=async function(){
   pendingDeleteHsId=null;
   closeDeleteModal();
   buildHsGrid(); renderHsMgGrid(); buildFilterPanel(); doFilter();
-  showToast(`Handshape "${removedVal}" deleted`);
+  showToast(isMainAdmin?`Handshape "${removedVal}" deleted`:`Handshape "${removedVal}" removed — sent to Main Admin for review`);
 };
 
 window.addHandshape=async function(){
