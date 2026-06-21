@@ -527,6 +527,7 @@ let HANDSHAPES    = [];   // handshapes/{id} → {value, image?}
 let CUSTOM_FIELDS = [];   // customFields/{id} → {name, type}
 let CUSTOM_OPTIONS= [];   // customFieldOptions/{id} → {fieldId, value}
 let FEEDBACKS     = [];   // feedback/{id}
+let dataLoadedPromise = null; // resolves once loadAll() has populated the arrays above
 
 let activeAZ=null, activeSpecial=[], activeWord=null, activeVideoType='how';
 let editingId=null, deletingId=null, editFormSpecial=[], editFormValues={};
@@ -984,7 +985,7 @@ onAuthStateChanged(auth, async user=>{
   }
   // Refresh detail panel (feedback box depends on login state) and admin tables
   if(activeWord){ const w=WORDS.find(x=>x.id===activeWord); if(w) renderDetail(w); }
-  if(document.getElementById('pageAdmin').classList.contains('active')) renderAdminTable();
+  if(document.getElementById('pageAdmin').classList.contains('active')) (dataLoadedPromise||Promise.resolve()).then(renderAdminTable);
   renderAboutView();
   if(isMainAdmin) refreshReviewBadge();
 });
@@ -997,7 +998,10 @@ window.showPage=function(p){
   if(p==='login'){ document.getElementById('pageLogin').classList.add('active'); }
   else if(p==='dict'){ document.getElementById('pageDict').classList.add('active'); document.getElementById('navDict').classList.add('active'); }
   else if(p==='admin'){
-    document.getElementById('pageAdmin').classList.add('active'); switchAdminTab('signs'); renderAdminTable();
+    document.getElementById('pageAdmin').classList.add('active'); switchAdminTab('signs');
+    const tbody=document.getElementById('adminTbody');
+    if(tbody && !tbody.children.length) tbody.innerHTML='<tr><td colspan="7" style="font-size:12px;color:var(--text3);padding:12px;">Loading…</td></tr>';
+    (dataLoadedPromise||Promise.resolve()).then(renderAdminTable);
     const reviewTab=document.getElementById('atReview');
     if(reviewTab){ reviewTab.style.display=isMainAdmin?'flex':'none'; }
     if(isMainAdmin) refreshReviewBadge();
@@ -1553,13 +1557,21 @@ window.confirmDelete=async function(){
 };
 
 /* ══ ADMIN TABS ══ */
-window.switchAdminTab=function(tab){
+window.switchAdminTab=async function(tab){
   ['signs','options','handshapes','feedback','review'].forEach(t=>{
     const k=t.charAt(0).toUpperCase()+t.slice(1);
     document.getElementById('at'+k)?.classList.toggle('active',t===tab);
     document.getElementById('ap'+k)?.classList.toggle('active',t===tab);
   });
   document.getElementById('addSignBtn').style.display=tab==='signs'?'':'none';
+  // Data (CATEGORIES/TOPICS/etc.) loads from Firestore asynchronously on page load.
+  // If a tab is opened before that finishes, show a loading placeholder instead of
+  // rendering against still-empty arrays (which looked like a permanently blank panel).
+  if(tab==='options'){
+    const wrap=document.getElementById('optionsCardsWrap');
+    if(wrap && !wrap.children.length) wrap.innerHTML='<p style="font-size:12px;color:var(--text3);padding:8px 2px;">Loading…</p>';
+  }
+  if(dataLoadedPromise) await dataLoadedPromise;
   if(tab==='options')    renderOptionsPanel();
   if(tab==='handshapes') renderHsMgGrid();
   if(tab==='feedback')   renderFeedbackAdmin();
@@ -1973,7 +1985,8 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeFsModal(); c
 
 /* ══ INIT ══ */
 async function init(){
-  try{ await loadAll(); }
+  dataLoadedPromise = loadAll();
+  try{ await dataLoadedPromise; }
   catch(e){ console.error(e); showToast('⚠ Firebase connection error. Check your config and Firestore rules.'); }
   await loadAboutContent();
   document.getElementById('appLoading').style.display='none';
