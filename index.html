@@ -1581,17 +1581,33 @@ window.switchAdminTab=async function(tab){
 /* ══ CATEGORIES & TAGS PANEL (per-document model) ══ */
 function renderOptionsPanel(){
   const wrap=document.getElementById('optionsCardsWrap'); wrap.innerHTML='';
-  wrap.appendChild(makeBuiltinCard('Categories','categories',CATEGORIES,'multiselect','cat','Multi-select on each sign.'));
-  wrap.appendChild(makeBuiltinCard('Topics / Subjects','topics',TOPICS,'multiselect','topic','Multi-select on each sign.'));
-  wrap.appendChild(makeBuiltinCard('Difficulty Levels','difficulties',DIFFICULTIES,'singleselect','diff','Single-select on each sign.'));
-  wrap.appendChild(makeBuiltinCard('Special Tags','tags',SPECIAL_TAGS,'multiselect','tag','Multi-select tags for filtering.',true));
+  appendBuiltinCard(wrap,'Categories','categories',CATEGORIES,'multiselect','cat','Multi-select on each sign.');
+  appendBuiltinCard(wrap,'Topics / Subjects','topics',TOPICS,'multiselect','topic','Multi-select on each sign.');
+  appendBuiltinCard(wrap,'Difficulty Levels','difficulties',DIFFICULTIES,'singleselect','diff','Single-select on each sign.');
+  appendBuiltinCard(wrap,'Special Tags','tags',SPECIAL_TAGS,'multiselect','tag','Multi-select tags for filtering.',true);
   CUSTOM_FIELDS.forEach(cf=>{
     const opts=CUSTOM_OPTIONS.filter(o=>o.fieldId===cf.id);
-    wrap.appendChild(makeCustomCard(cf,opts));
+    appendCustomCard(wrap,cf,opts);
   });
 }
 
-function makeBuiltinCard(title,colName,items,type,key,subtitle,wide=false){
+// Builds the card shell, appends it to the live DOM (wrap is already attached to
+// the document), THEN renders its rows. Row rendering depends on document.getElementById,
+// which only finds elements that are already attached — calling it before appendChild
+// silently fails and leaves the card permanently empty.
+function appendBuiltinCard(wrap,title,colName,items,type,key,subtitle,wide=false){
+  const card=makeBuiltinCard(title,colName,type,key,subtitle,wide);
+  wrap.appendChild(card);
+  renderValueRows('blt_'+key,items,wide,(id,val)=>renameBuiltinValue(colName,key,id,val),(id)=>deleteBuiltinValue(colName,key,id));
+}
+
+function appendCustomCard(wrap,cf,items){
+  const card=makeCustomCard(cf);
+  wrap.appendChild(card);
+  renderValueRows('cst_'+cf.id,items,false,(id,val)=>renameCustomValue(cf.id,id,val),(id)=>deleteCustomValue(cf.id,id));
+}
+
+function makeBuiltinCard(title,colName,type,key,subtitle,wide=false){
   const card=document.createElement('div'); card.className='options-card';
   if(wide) card.style.gridColumn='1/-1';
   const listId='blt_'+key;
@@ -1601,11 +1617,10 @@ function makeBuiltinCard(title,colName,items,type,key,subtitle,wide=false){
     <div class="options-list" id="${listId}" ${wide?'style="flex-direction:row;flex-wrap:wrap;max-height:none;"':''}></div>
     <div class="options-add-row"><input type="text" id="new_${key}" placeholder="New value..." onkeydown="if(event.key==='Enter')addBuiltinValue('${colName}','${key}')"/><button onclick="addBuiltinValue('${colName}','${key}')">Add</button></div>
   `;
-  renderValueRows(listId,items,wide,(id,val)=>renameBuiltinValue(colName,key,id,val),(id)=>deleteBuiltinValue(colName,key,id));
   return card;
 }
 
-function makeCustomCard(cf,items){
+function makeCustomCard(cf){
   const card=document.createElement('div'); card.className='options-card';
   const listId='cst_'+cf.id;
   card.innerHTML=`
@@ -1617,7 +1632,6 @@ function makeCustomCard(cf,items){
     <div class="options-list" id="${listId}"></div>
     <div class="options-add-row"><input type="text" id="newc_${cf.id}" placeholder="New value..." onkeydown="if(event.key==='Enter')addCustomValue('${cf.id}')"/><button onclick="addCustomValue('${cf.id}')">Add</button></div>
   `;
-  renderValueRows(listId,items,false,(id,val)=>renameCustomValue(cf.id,id,val),(id)=>deleteCustomValue(cf.id,id));
   return card;
 }
 
