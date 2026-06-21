@@ -122,6 +122,15 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .vid-ph{display:flex;flex-direction:column;align-items:center;gap:8px;background:var(--bg2);width:100%;height:100%;justify-content:center;}
 .vid-ph i{font-size:28px;color:var(--text3);}
 .vid-ph p{font-size:12px;color:var(--text3);}
+.rv-vid-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
+.rv-vid-cell{flex:1;min-width:140px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--r-md);padding:8px;}
+.rv-vid-label{font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px;margin-bottom:6px;}
+.rv-vid-thumb{position:relative;aspect-ratio:16/9;border-radius:var(--r-sm);overflow:hidden;background:#000;cursor:pointer;}
+.rv-vid-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.rv-vid-thumb iframe{width:100%;height:100%;border:none;}
+.rv-vid-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.25);color:white;font-size:22px;}
+.rv-vid-thumb:hover .rv-vid-play{background:rgba(0,0,0,0.4);}
+.rv-vid-empty{aspect-ratio:16/9;border-radius:var(--r-sm);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text3);}
 .entry-desc{font-size:13px;color:var(--text2);line-height:1.65;padding-top:14px;border-top:0.5px solid var(--border);}
 .entry-desc strong{color:var(--text);font-weight:500;}
 .feedback-wrap{margin-top:16px;padding-top:14px;border-top:0.5px solid var(--border);}
@@ -728,6 +737,40 @@ function diffSummary(before, after){
   return rows.length ? rows.join('') : '<p style="font-size:12px;color:var(--text3);">No visible field differences.</p>';
 }
 
+// Small click-to-load video thumbnails for a pending sign review, so Main
+// Admin can sanity-check "how/concept/example" videos right on the Pending
+// Review tab instead of having to open the Dictionary page first. Shows the
+// proposed (after) ID for each of the three video slots — that's the value
+// being approved. The iframe is only created once the admin clicks the
+// thumbnail (not on render), so loading the review list never silently
+// fires off three YouTube embeds per pending item.
+function videoPreviewRow(after, reviewId){
+  const types=['how','concept','example'];
+  const cells=types.map(t=>{
+    const m=VID_META[t];
+    const ytId=safeYtId(after?.['vid_'+t]);
+    const cellId=`rvVid_${esc(reviewId)}_${t}`;
+    if(!ytId){
+      return `<div class="rv-vid-cell" style="border-color:${m.light};">
+        <div class="rv-vid-label" style="color:${m.color};"><i class="ti ${m.icon}"></i> ${m.label}</div>
+        <div class="rv-vid-empty">No video</div>
+      </div>`;
+    }
+    return `<div class="rv-vid-cell" style="border-color:${m.light};">
+      <div class="rv-vid-label" style="color:${m.color};"><i class="ti ${m.icon}"></i> ${m.label}</div>
+      <div class="rv-vid-thumb" id="${cellId}" onclick="loadReviewVideo('${cellId}','${ytId}')">
+        <img src="https://i.ytimg.com/vi/${ytId}/hqdefault.jpg" loading="lazy" alt=""/>
+        <div class="rv-vid-play"><i class="ti ti-player-play-filled"></i></div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="rv-vid-row">${cells}</div>`;
+}
+window.loadReviewVideo=function(cellId, ytId){
+  const el=document.getElementById(cellId); if(!el) return;
+  el.innerHTML=`<iframe src="https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0" allow="autoplay;encrypted-media;picture-in-picture" allowfullscreen></iframe>`;
+};
+
 window.renderPendingReviewsAdmin=async function(){
   const el=document.getElementById('reviewAdminList');
   if(el) el.innerHTML='<p style="color:var(--text3);font-size:13px;">Loading…</p>';
@@ -743,6 +786,10 @@ window.renderPendingReviewsAdmin=async function(){
     const body = r.action==='delete'
       ? `<p style="font-size:12px;color:var(--text2);margin-top:6px;">Will be permanently removed from <strong>${esc(r.collection)}</strong> if approved. Currently hidden from guests and staff.</p>`
       : `<div class="diff-list">${diffSummary(r.snapshotBefore, r.snapshotAfter)}</div>`;
+    // Video thumbnails only make sense for sign edits (that's the only
+    // collection with vid_how/vid_concept/vid_example fields).
+    const videoRow = (r.action==='edit' && r.collection==='signs')
+      ? videoPreviewRow(r.snapshotAfter, r.id) : '';
     return `<div class="fb-card">
       <div class="fb-card-header">
         <span style="font-size:12px;font-weight:600;">${esc(r.docLabel)}</span>
@@ -751,6 +798,7 @@ window.renderPendingReviewsAdmin=async function(){
         <span class="fb-sign-ref">by ${esc(r.editedByName)}</span>
       </div>
       ${body}
+      ${videoRow}
       <div class="row-actions" style="margin-top:8px;">
         <button class="row-btn" onclick="approveReview('${r.id}')"><i class="ti ti-check"></i> Approve</button>
         <button class="row-btn del" onclick="rejectReview('${r.id}')"><i class="ti ti-rotate"></i> Reject &amp; revert</button>
