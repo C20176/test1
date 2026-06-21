@@ -130,6 +130,13 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .star{font-size:22px;cursor:pointer;color:var(--border2);user-select:none;}
 .star.on{color:#F59E0B;}
 .fb-type-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+.fb-name-row{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+.fb-name-input{width:100%;font-size:12px;padding:7px 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);outline:none;}
+.fb-name-input:focus{border-color:var(--accent);background:var(--bg);}
+.fb-name-input:disabled{opacity:0.55;cursor:not-allowed;}
+.fb-anon-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);cursor:pointer;user-select:none;}
+.fb-anon-toggle input{cursor:pointer;}
+.fb-anon-preview{color:var(--text3);font-style:italic;}
 .fb-type{font-size:11px;padding:4px 10px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;}
 .fb-type.on{background:var(--accent);color:white;border-color:var(--accent);}
 .fb-textarea{width:100%;font-size:12px;padding:8px 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);outline:none;resize:vertical;min-height:60px;margin-bottom:8px;}
@@ -530,8 +537,13 @@ async function loadAll(){
   CUSTOM_FIELDS = await loadCollection('customFields');
   CUSTOM_OPTIONS= await loadCollection('customFieldOptions');
 
-  // Seed built-in defaults ONLY if completely empty (first run)
-  if(!CATEGORIES.length) await seedDefaults();
+  // Seed built-in defaults ONLY if completely empty (first run).
+  // Guests aren't allowed to write per Firestore rules, so swallow any
+  // permission error here instead of letting it fail the whole load.
+  if(!CATEGORIES.length){
+    try{ await seedDefaults(); }
+    catch(err){ console.warn('Skipped seeding defaults (likely not signed in):', err); }
+  }
 
   sortHandshapes();
 }
@@ -595,6 +607,45 @@ async function deleteWordDoc(id){
   finally{ showSaving(false); }
 }
 
+/* ══ USER NICKNAME / ANONYMITY PREFERENCE (users/{uid}) ══
+   Lets a signed-in commenter pick their own display name, or hide it
+   behind a stable "Anonymous_####" label derived from their uid.
+   Stored server-side (not cookies) so it follows them across devices. */
+let userPrefs=null; // {nickname, anonymous} for currentUser, cached after first load
+
+function anonLabelFor(uid){
+  let h=0;
+  for(let i=0;i<uid.length;i++) h=(h*31 + uid.charCodeAt(i))>>>0;
+  return 'Anonymous_'+String(h%10000).padStart(4,'0');
+}
+
+async function loadUserPrefs(){
+  if(!currentUser){ userPrefs=null; return null; }
+  try{
+    const snap=await getDoc(doc(db,'users',currentUser.uid));
+    userPrefs = snap.exists() ? snap.data() : {nickname:currentUser.displayName||'', anonymous:false};
+  }catch(err){
+    console.error('loadUserPrefs failed:',err);
+    userPrefs = {nickname:currentUser.displayName||'', anonymous:false};
+  }
+  return userPrefs;
+}
+
+async function saveUserPrefs(nickname, anonymous){
+  if(!currentUser) return;
+  userPrefs = {nickname, anonymous};
+  try{ await setDoc(doc(db,'users',currentUser.uid),{nickname,anonymous},{merge:true}); }
+  catch(err){ console.error('saveUserPrefs failed:',err); }
+}
+
+// Resolves the name that should actually be stored/shown for this feedback entry.
+function resolveDisplayName(){
+  if(!currentUser) return 'Anonymous';
+  if(userPrefs?.anonymous) return anonLabelFor(currentUser.uid);
+  const nick=(userPrefs?.nickname||'').trim();
+  return nick || currentUser.displayName || 'Anonymous';
+}
+
 async function loadFeedback(){
   try{
     const snap = await getDocs(query(collection(db,'feedback'), orderBy('ts','desc')));
@@ -642,6 +693,7 @@ async function checkIsAdmin(user){
 onAuthStateChanged(auth, async user=>{
   currentUser=user;
   isAdmin = user ? await checkIsAdmin(user) : false;
+  await loadUserPrefs();
   const uEl=document.getElementById('headerUser'), aBtn=document.getElementById('adminNavBtn'),
         lBtn=document.getElementById('loginNavBtn'), oBtn=document.getElementById('logoutBtn');
   if(user){
@@ -890,8 +942,17 @@ function renderFeedbackSection(w){
 
   // Comment box: requires guest Google login (separate from admin login)
   const isLoggedIn = !!currentUser;
+  const prefNick = userPrefs?.nickname || currentUser?.displayName || '';
+  const prefAnon = !!userPrefs?.anonymous;
   const commentBox = isLoggedIn
-    ? `<div class="star-row" id="starRow_${w.id}">
+    ? `<div class="fb-name-row">
+         <input type="text" class="fb-name-input" id="fbNick_${w.id}" placeholder="Your display name" value="${prefAnon?'':prefNick.replace(/"/g,'&quot;')}" ${prefAnon?'disabled':''} oninput="onNickInput('${w.id}')"/>
+         <label class="fb-anon-toggle">
+           <input type="checkbox" id="fbAnon_${w.id}" ${prefAnon?'checked':''} onchange="onAnonToggle('${w.id}')"/>
+           <span>Post anonymously<span class="fb-anon-preview" id="fbAnonPreview_${w.id}">${prefAnon?` (shown as ${anonLabelFor(currentUser.uid)})`:''}</span></span>
+         </label>
+       </div>
+       <div class="star-row" id="starRow_${w.id}">
          ${[1,2,3,4,5].map(n=>`<span class="star" onclick="setFbRating(${n},'${w.id}')" onmouseover="hoverStars(${n},'${w.id}')" onmouseout="resetStarHover('${w.id}')">★</span>`).join('')}
        </div>
        <div class="fb-type-row">${['Bug','Suggestion','Other'].map(t=>`<span class="fb-type" onclick="setFbType('${t}','${w.id}')">${t}</span>`).join('')}</div>
@@ -900,7 +961,7 @@ function renderFeedbackSection(w){
          <button class="fb-submit" onclick="submitFeedback('${w.id}')">Send feedback</button>
          <span class="fb-success" id="fbSuccess_${w.id}"><i class="ti ti-circle-check"></i> Thank you!</span>
        </div>
-       <p class="fb-privacy-note"><i class="ti ti-lock" style="margin-right:3px;"></i>Your comment is private by default. Our team may choose to make helpful comments public for discussion. Only your name and comment are ever shown — never your email.</p>`
+       <p class="fb-privacy-note"><i class="ti ti-lock" style="margin-right:3px;"></i>Your comment is private by default. Our team may choose to make helpful comments public for discussion. Only your chosen name and comment are ever shown — never your email.</p>`
     : (hasRatedBefore(w.id)
        ? `<div class="fb-guest-login">
             <p><i class="ti ti-circle-check" style="color:var(--success);margin-right:4px;"></i>You've already rated this sign on this device. Thanks!</p>
@@ -939,17 +1000,36 @@ window.resetStarHover=function(wId){ updateStars(fbRating,wId); };
 function updateStars(n,wId){ document.querySelectorAll(`#starRow_${wId} .star`).forEach((s,i)=>s.classList.toggle('on',i<n)); }
 window.setFbType=function(t,wId){ fbType=t; document.querySelectorAll('#rightPanel .fb-type').forEach(el=>el.classList.toggle('on',el.textContent===t)); };
 
+// Debounced-ish save: persists nickname as the user types
+let nickSaveTimer;
+window.onNickInput=function(wId){
+  if(!currentUser) return;
+  const val=document.getElementById(`fbNick_${wId}`)?.value||'';
+  clearTimeout(nickSaveTimer);
+  nickSaveTimer=setTimeout(()=>{ saveUserPrefs(val, !!userPrefs?.anonymous); }, 500);
+};
+
+window.onAnonToggle=function(wId){
+  if(!currentUser) return;
+  const checked=document.getElementById(`fbAnon_${wId}`)?.checked||false;
+  const nickInput=document.getElementById(`fbNick_${wId}`);
+  const preview=document.getElementById(`fbAnonPreview_${wId}`);
+  if(nickInput) nickInput.disabled=checked;
+  if(preview) preview.textContent = checked ? ` (shown as ${anonLabelFor(currentUser.uid)})` : '';
+  saveUserPrefs(nickInput?.value||'', checked);
+};
+
 window.submitFeedback=async function(wId){
   if(!currentUser){ showToast('Please sign in with Google to comment.'); return; }
   const text=document.getElementById(`fbText_${wId}`)?.value.trim()||'';
   if(!fbRating&&!text){ showToast('Please add a rating or comment.'); return; }
   const w=WORDS.find(x=>x.id===wId);
-  const displayName=currentUser.displayName||'Anonymous';
+  const displayName=resolveDisplayName();
   try{
     await addDoc(collection(db,'feedback'),{
       signId:wId, signName:w?.en||'',
       rating:fbRating, type:fbType||'Other', text,
-      displayName, // name only — email intentionally NOT stored
+      displayName, // chosen nickname or Anonymous_#### — email intentionally NOT stored
       isPublic:false, // private by default; admin can make public
       teamReply:'',
       ts:Date.now()
