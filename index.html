@@ -1812,21 +1812,26 @@ window.addNewCategoryBlock=async function(){
   showToast(`Category "${name}" created${opts.length?` with ${opts.length} option(s)`:''}`);
 };
 
+// Deletes a whole custom category (the field doc + all its options). Routed through
+// deleteValueDoc() — same as every other delete in the app — instead of a raw deleteDoc():
+// Firestore rules only grant hard delete() to Main Admin, so a staff admin calling
+// deleteDoc() directly here would always fail with permission-denied. Going through
+// deleteValueDoc()/submitDeleteWithReview() gives staff the same "soft-hide now,
+// finalize on Main Admin approval" path that signs/handshapes/builtin values already use.
 window.deleteCustomCategory=async function(fieldId){
   const cf=CUSTOM_FIELDS.find(f=>f.id===fieldId); if(!cf) return;
-  if(!confirm(`Delete category "${cf.name}"? This removes it from all signs.`)) return;
-  showSaving(true);
-  try{
-    await deleteDoc(doc(db,'customFields',fieldId));
-    const opts=CUSTOM_OPTIONS.filter(o=>o.fieldId===fieldId);
-    await Promise.all(opts.map(o=>deleteDoc(doc(db,'customFieldOptions',o.id))));
-  }catch(err){ console.error(err); showToast('⚠ Could not delete category.'); showSaving(false); return; }
-  showSaving(false);
+  const note = isMainAdmin
+    ? 'This cannot be undone.'
+    : 'This will be hidden right away and sent to Main Admin for review.';
+  if(!confirm(`Delete category "${cf.name}"? This removes it from all signs.\n${note}`)) return;
+  const opts=CUSTOM_OPTIONS.filter(o=>o.fieldId===fieldId);
+  await deleteValueDoc('customFields', fieldId, cf.name);
+  await Promise.all(opts.map(o=>deleteValueDoc('customFieldOptions', o.id, o.value)));
   CUSTOM_FIELDS=CUSTOM_FIELDS.filter(f=>f.id!==fieldId);
   CUSTOM_OPTIONS=CUSTOM_OPTIONS.filter(o=>o.fieldId!==fieldId);
   WORDS.forEach(w=>{ delete w['cf_'+fieldId]; });
   buildFilterPanel(); renderOptionsPanel();
-  showToast('Category deleted');
+  showToast(isMainAdmin?'Category deleted':'Category removed — sent to Main Admin for review');
 };
 
 window.addCustomValue=async function(fieldId){
