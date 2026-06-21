@@ -538,6 +538,42 @@ let isAdmin=false; // determined by checking admins/{email} collection after log
 let isMainAdmin=false; // true only if admins/{email}.role === 'main'
 let adminName=''; // display name from admins/{email}.name, falls back to email
 
+// Escapes any string before it goes into an innerHTML template literal. Every value that
+// ultimately comes from Firestore (sign names, category/tag values, feedback text, nicknames,
+// custom field names, etc.) is technically user-supplied — without this, anyone able to write
+// one of those fields (including any guest submitting feedback) could inject HTML/JS that runs
+// in another visitor's or admin's browser (stored XSS).
+function esc(str){
+  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// YouTube IDs are free-text admin input that ends up inside both an iframe `src` and an
+// inline onclick attribute — a context where HTML-escaping quotes isn't enough (the browser
+// decodes entities before running inline JS, so a smuggled quote could still break out).
+// Stripping to the actual valid YouTube ID charset closes that off entirely.
+function safeYtId(id){ return String(id||'').replace(/[^A-Za-z0-9_-]/g,''); }
+
+// Built-in field metadata, keyed both by Firestore collection name and by the short key used
+// in the sign editor / filters. Written as functions (not cached objects) so they always read
+// the CURRENT value of CATEGORIES/TOPICS/etc. — those arrays are reassigned wholesale on every
+// load, so a frozen-at-parse-time object here would silently hold onto stale, empty arrays.
+function builtinFieldByCol(colName){
+  return {
+    categories:  {arr:CATEGORIES,   field:'cat',    key:'cat'},
+    topics:      {arr:TOPICS,       field:'topic',  key:'topic'},
+    difficulties:{arr:DIFFICULTIES, field:'diff',   key:'diff'},
+    tags:        {arr:SPECIAL_TAGS, field:'special',key:'tag'},
+  }[colName];
+}
+function builtinFieldByKey(key){
+  return {
+    cat:  {col:'categories',   arr:CATEGORIES},
+    topic:{col:'topics',       arr:TOPICS},
+    diff: {col:'difficulties', arr:DIFFICULTIES},
+    tag:  {col:'tags',         arr:SPECIAL_TAGS},
+    hand: {col:'handshapes',   arr:HANDSHAPES},
+  }[key];
+}
+
 const CAT_C={"_default":["#F1EFE8","#444441"]};
 const PALETTE=[["#EEEDFE","#534AB7"],["#E1F5EE","#0F6E56"],["#FAEEDA","#854F0B"],["#FAECE7","#993C1D"],["#E6F1FB","#185FA5"],["#EAF3DE","#3B6D11"],["#F1EFE8","#5F5E5A"]];
 function colorFor(str){ let h=0; for(let i=0;i<str.length;i++) h=str.charCodeAt(i)+((h<<5)-h); return PALETTE[Math.abs(h)%PALETTE.length]; }
@@ -687,7 +723,7 @@ function diffSummary(before, after){
     if(skip.has(k)) return;
     const bv=JSON.stringify(before?.[k]??'');
     const av=JSON.stringify(after?.[k]??'');
-    if(bv!==av) rows.push(`<div class="diff-row"><span class="diff-field">${k}</span><span class="diff-before">${(before?.[k]??'—')}</span><i class="ti ti-arrow-right"></i><span class="diff-after">${(after?.[k]??'—')}</span></div>`);
+    if(bv!==av) rows.push(`<div class="diff-row"><span class="diff-field">${esc(k)}</span><span class="diff-before">${esc(before?.[k]??'—')}</span><i class="ti ti-arrow-right"></i><span class="diff-after">${esc(after?.[k]??'—')}</span></div>`);
   });
   return rows.length ? rows.join('') : '<p style="font-size:12px;color:var(--text3);">No visible field differences.</p>';
 }
@@ -705,14 +741,14 @@ window.renderPendingReviewsAdmin=async function(){
       ? `<span class="fb-badge" style="background:var(--danger-light);color:var(--danger);">Delete</span>`
       : `<span class="fb-badge" style="background:var(--vexample-light);color:var(--vexample);">Edit</span>`;
     const body = r.action==='delete'
-      ? `<p style="font-size:12px;color:var(--text2);margin-top:6px;">Will be permanently removed from <strong>${r.collection}</strong> if approved. Currently hidden from guests and staff.</p>`
+      ? `<p style="font-size:12px;color:var(--text2);margin-top:6px;">Will be permanently removed from <strong>${esc(r.collection)}</strong> if approved. Currently hidden from guests and staff.</p>`
       : `<div class="diff-list">${diffSummary(r.snapshotBefore, r.snapshotAfter)}</div>`;
     return `<div class="fb-card">
       <div class="fb-card-header">
-        <span style="font-size:12px;font-weight:600;">${r.docLabel}</span>
+        <span style="font-size:12px;font-weight:600;">${esc(r.docLabel)}</span>
         ${actionBadge}
-        <span class="fb-sign-ref">${r.collection}</span>
-        <span class="fb-sign-ref">by ${r.editedByName}</span>
+        <span class="fb-sign-ref">${esc(r.collection)}</span>
+        <span class="fb-sign-ref">by ${esc(r.editedByName)}</span>
       </div>
       ${body}
       <div class="row-actions" style="margin-top:8px;">
@@ -725,14 +761,8 @@ window.renderPendingReviewsAdmin=async function(){
 };
 
 async function loadAll(){
-  WORDS         = await loadCollection('signs');
-  CATEGORIES    = await loadCollection('categories');
-  TOPICS        = await loadCollection('topics');
-  DIFFICULTIES  = await loadCollection('difficulties');
-  SPECIAL_TAGS  = await loadCollection('tags');
-  HANDSHAPES    = await loadCollection('handshapes');
-  CUSTOM_FIELDS = await loadCollection('customFields');
-  CUSTOM_OPTIONS= await loadCollection('customFieldOptions');
+  [WORDS, CATEGORIES, TOPICS, DIFFICULTIES, SPECIAL_TAGS, HANDSHAPES, CUSTOM_FIELDS, CUSTOM_OPTIONS] =
+    await Promise.all(['signs','categories','topics','difficulties','tags','handshapes','customFields','customFieldOptions'].map(loadCollection));
 
   // Seed built-in defaults ONLY if completely empty (first run).
   // Guests aren't allowed to write per Firestore rules, so swallow any
@@ -759,16 +789,15 @@ async function seedDefaults(){
   const diffs=["Beginner","Intermediate","Advanced"];
   const tags=["Two-handed","One-handed","Symmetric","Body contact","Facial expression","Slow motion","High frequency"];
   const hands="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-  for(const v of cats)  await addDoc(collection(db,'categories'),{value:v});
-  for(const v of tops)  await addDoc(collection(db,'topics'),{value:v});
-  for(const v of diffs) await addDoc(collection(db,'difficulties'),{value:v});
-  for(const v of tags)  await addDoc(collection(db,'tags'),{value:v});
-  for(let i=0;i<hands.length;i++) await addDoc(collection(db,'handshapes'),{value:hands[i],order:i});
-  CATEGORIES   = await loadCollection('categories');
-  TOPICS       = await loadCollection('topics');
-  DIFFICULTIES = await loadCollection('difficulties');
-  SPECIAL_TAGS = await loadCollection('tags');
-  HANDSHAPES   = await loadCollection('handshapes');
+  await Promise.all([
+    ...cats.map(v=>addDoc(collection(db,'categories'),{value:v})),
+    ...tops.map(v=>addDoc(collection(db,'topics'),{value:v})),
+    ...diffs.map(v=>addDoc(collection(db,'difficulties'),{value:v})),
+    ...tags.map(v=>addDoc(collection(db,'tags'),{value:v})),
+    ...hands.map((v,i)=>addDoc(collection(db,'handshapes'),{value:v,order:i})),
+  ]);
+  [CATEGORIES, TOPICS, DIFFICULTIES, SPECIAL_TAGS, HANDSHAPES] =
+    await Promise.all(['categories','topics','difficulties','tags','handshapes'].map(loadCollection));
 }
 
 // Generic CRUD for a "simple value" collection (categories/topics/difficulties/tags/handshapes)
@@ -975,7 +1004,7 @@ onAuthStateChanged(auth, async user=>{
         lBtn=document.getElementById('loginNavBtn'), oBtn=document.getElementById('logoutBtn');
   if(user){
     uEl.style.display='flex';
-    uEl.innerHTML=user.photoURL?`<img src="${user.photoURL}"/><span>${user.displayName||user.email}</span>`:`<i class="ti ti-user-circle"></i><span>${user.email}</span>`;
+    uEl.innerHTML=user.photoURL?`<img src="${esc(user.photoURL)}"/><span>${esc(user.displayName||user.email)}</span>`:`<i class="ti ti-user-circle"></i><span>${esc(user.email)}</span>`;
     aBtn.style.display=isAdmin?'flex':'none';
     lBtn.style.display='none'; oBtn.style.display='flex';
     if(document.getElementById('pageLogin').classList.contains('active')) showPage('dict');
@@ -1064,7 +1093,7 @@ function buildFilterPanel(){
   const wrap=document.getElementById('filterFieldsWrap'); wrap.innerHTML='';
   function makeSelect(id,label,values){
     const d=document.createElement('div'); d.className='adv-field';
-    d.innerHTML=`<label>${label}</label><select id="${id}" onchange="doFilter()"><option value="">All</option></select>`;
+    d.innerHTML=`<label>${esc(label)}</label><select id="${id}" onchange="doFilter()"><option value="">All</option></select>`;
     const sel=d.querySelector('select');
     values.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
     return d;
@@ -1122,9 +1151,9 @@ window.doFilter=function(){
     const sub=currentLang==='es'&&w.es?w.es:(cats[0]||'');
     const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
     return `<div class="word-row${activeWord===w.id?' active':''}" onclick="selectWord('${w.id}')">
-      <span class="word-en">${w.en}</span>
-      <span class="word-sub">${sub}</span>
-      <span class="pill" style="background:${cc[0]};color:${cc[1]}">${hands[0]||''}</span>
+      <span class="word-en">${esc(w.en)}</span>
+      <span class="word-sub">${esc(sub)}</span>
+      <span class="pill" style="background:${cc[0]};color:${cc[1]}">${esc(hands[0]||'')}</span>
     </div>`;
   }).join('');
 };
@@ -1155,19 +1184,19 @@ function renderDetail(w){
     const wVal=w[def.field];
     const vals=def.type==='singleselect'?(wVal?[wVal]:[]):(Array.isArray(wVal)?wVal:(wVal?[wVal]:[]));
     if(!vals.length) return '';
-    if(def.key==='diff') return vals.map(v=>`<span class="pill" style="background:${dc[0]};color:${dc[1]}">${v}</span>`).join('');
-    return vals.map(v=>{ const cc=colorFor(def.name+v); return `<span class="pill" style="background:${cc[0]};color:${cc[1]}">${def.key.startsWith('cf_')?def.name+': ':''}${v}</span>`; }).join('');
+    if(def.key==='diff') return vals.map(v=>`<span class="pill" style="background:${dc[0]};color:${dc[1]}">${esc(v)}</span>`).join('');
+    return vals.map(v=>{ const cc=colorFor(def.name+v); return `<span class="pill" style="background:${cc[0]};color:${cc[1]}">${def.key.startsWith('cf_')?esc(def.name)+': ':''}${esc(v)}</span>`; }).join('');
   }).join('');
   const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
-  const handPills=hands.map(h=>`<span class="pill" style="background:var(--accent-light);color:var(--accent)">Handshape ${h}</span>`).join('');
-  const specialPills=(w.special||[]).map(s=>`<span class="pill" style="background:var(--bg2);color:var(--text2);border:0.5px solid var(--border)">${s}</span>`).join('');
+  const handPills=hands.map(h=>`<span class="pill" style="background:var(--accent-light);color:var(--accent)">Handshape ${esc(h)}</span>`).join('');
+  const specialPills=(w.special||[]).map(s=>`<span class="pill" style="background:var(--bg2);color:var(--text2);border:0.5px solid var(--border)">${esc(s)}</span>`).join('');
 
   const tabs=['how','concept','example'].map(type=>{
     const m=VID_META[type]; const isActive=type===activeVideoType;
     return `<div class="vid-tab${isActive?' active':''}" data-type="${type}" onclick="switchVideoTab('${w.id}','${type}')"><i class="ti ${m.icon}"></i><span>${m.label}</span></div>`;
   }).join('');
 
-  const ytId=w['vid_'+activeVideoType];
+  const ytId=safeYtId(w['vid_'+activeVideoType]);
   const videoHtml=ytId
     ?`<iframe src="https://www.youtube.com/embed/${ytId}?rel=0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe>
       <button style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.55);border:none;border-radius:var(--r-sm);padding:5px 10px;color:white;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="openFsModal('${ytId}')"><i class="ti ti-maximize"></i> Fullscreen</button>`
@@ -1175,12 +1204,12 @@ function renderDetail(w){
 
   document.getElementById('rightPanel').innerHTML=`
     <div class="detail-card">
-      <p class="entry-en">${w.en}</p>
-      ${w.es?`<p class="entry-es">${w.es}</p>`:''}
+      <p class="entry-en">${esc(w.en)}</p>
+      ${w.es?`<p class="entry-es">${esc(w.es)}</p>`:''}
       <div class="entry-tags">${pillsHtml}${handPills}${specialPills}</div>
       <div class="vid-tabs">${tabs}</div>
       <div class="video-box">${videoHtml}</div>
-      <p class="entry-desc"><strong>How to sign:</strong> ${w.desc||''}</p>
+      <p class="entry-desc"><strong>How to sign:</strong> ${esc(w.desc||'')}</p>
       <div class="feedback-wrap" id="feedbackWrap_${w.id}">
         ${renderFeedbackSection(w)}
       </div>
@@ -1209,7 +1238,7 @@ function renderFeedbackSection(w){
     const name = f.displayName || 'Anonymous';
     const privacyBadge = !f.isPublic ? `<span class="fb-badge" style="background:var(--bg2);color:var(--text3);">Private</span>` : '';
     const reply = f.teamReply
-      ? `<div class="fb-team-reply"><div class="fb-team-reply-header"><i class="ti ti-shield-check" style="margin-right:3px;"></i>Response from the team</div><div class="fb-team-reply-text">${f.teamReply}</div></div>`
+      ? `<div class="fb-team-reply"><div class="fb-team-reply-header"><i class="ti ti-shield-check" style="margin-right:3px;"></i>Response from the team</div><div class="fb-team-reply-text">${esc(f.teamReply)}</div></div>`
       : '';
     const adminActions = isAdmin ? `
       <div class="fb-comment-actions">
@@ -1220,8 +1249,8 @@ function renderFeedbackSection(w){
         <button class="fb-mini-btn danger" onclick="deleteFeedback('${f.id}','${w.id}')"><i class="ti ti-trash"></i> Delete</button>
       </div>` : '';
     return `<div class="fb-comment">
-      <div class="fb-comment-header"><span class="fb-comment-name">${name}</span>${stars}${privacyBadge}<span class="fb-comment-date">${date}</span></div>
-      <div class="fb-comment-text">${f.text}</div>
+      <div class="fb-comment-header"><span class="fb-comment-name">${esc(name)}</span>${stars}${privacyBadge}<span class="fb-comment-date">${date}</span></div>
+      <div class="fb-comment-text">${esc(f.text)}</div>
       ${reply}
       ${adminActions}
     </div>`;
@@ -1233,7 +1262,7 @@ function renderFeedbackSection(w){
   const prefAnon = !!userPrefs?.anonymous;
   const commentBox = isLoggedIn
     ? `<div class="fb-name-row">
-         <input type="text" class="fb-name-input" id="fbNick_${w.id}" placeholder="Your display name" value="${prefAnon?'':prefNick.replace(/"/g,'&quot;')}" ${prefAnon?'disabled':''} oninput="onNickInput('${w.id}')"/>
+         <input type="text" class="fb-name-input" id="fbNick_${w.id}" placeholder="Your display name" value="${prefAnon?'':esc(prefNick)}" ${prefAnon?'disabled':''} oninput="onNickInput('${w.id}')"/>
          <label class="fb-anon-toggle">
            <input type="checkbox" id="fbAnon_${w.id}" ${prefAnon?'checked':''} onchange="onAnonToggle('${w.id}')"/>
            <span>Post anonymously<span class="fb-anon-preview" id="fbAnonPreview_${w.id}">${prefAnon?` (shown as ${anonLabelFor(currentUser.uid)})`:''}</span></span>
@@ -1277,7 +1306,7 @@ function renderFeedbackSection(w){
 }
 
 window.switchVideoTab=function(wId,type){ const w=WORDS.find(x=>x.id===wId); if(!w) return; activeVideoType=type; renderDetail(w); };
-window.openFsModal=function(ytId){ document.getElementById('fsIframe').src=`https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0`; document.getElementById('fsModal').classList.add('show'); };
+window.openFsModal=function(ytId){ ytId=safeYtId(ytId); document.getElementById('fsIframe').src=`https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0`; document.getElementById('fsModal').classList.add('show'); };
 window.closeFsModal=function(){ document.getElementById('fsIframe').src=''; document.getElementById('fsModal').classList.remove('show'); };
 
 /* ══ FEEDBACK (public submit) ══ */
@@ -1406,11 +1435,11 @@ function renderAdminTable(){
     const dots=['how','concept','example'].map(t=>`<span class="vdot ${w['vid_'+t]?'on':'off'}" title="${VID_META[t].label}"></span>`).join('');
     const reviewBadge=w._pendingReviewId?`<span class="fb-badge" style="background:var(--vexample-light);color:var(--vexample);margin-left:4px;" title="Edited by staff, awaiting Main Admin review">Pending review</span>`:'';
     return `<tr>
-      <td style="font-weight:500">${w.en}${reviewBadge}</td>
-      <td style="color:var(--text2);font-style:italic">${w.es||'—'}</td>
-      <td>${cats.map(c=>{const x=colorFor(c);return `<span class="pill" style="background:${x[0]};color:${x[1]};margin-right:2px;">${c}</span>`;}).join('')}</td>
-      <td>${hands.map(h=>`<span class="pill" style="background:var(--accent-light);color:var(--accent);margin-right:2px;">${h}</span>`).join('')}</td>
-      <td style="color:var(--text2)">${w.diff||''}</td>
+      <td style="font-weight:500">${esc(w.en)}${reviewBadge}</td>
+      <td style="color:var(--text2);font-style:italic">${esc(w.es||'—')}</td>
+      <td>${cats.map(c=>{const x=colorFor(c);return `<span class="pill" style="background:${x[0]};color:${x[1]};margin-right:2px;">${esc(c)}</span>`;}).join('')}</td>
+      <td>${hands.map(h=>`<span class="pill" style="background:var(--accent-light);color:var(--accent);margin-right:2px;">${esc(h)}</span>`).join('')}</td>
+      <td style="color:var(--text2)">${esc(w.diff||'')}</td>
       <td><div style="display:flex;gap:4px;">${dots}</div></td>
       <td><div class="row-actions">
         <button class="row-btn" onclick="openEditModal('${w.id}')"><i class="ti ti-pencil"></i> Edit</button>
@@ -1463,7 +1492,7 @@ function buildModalFields(w){
     const fd=document.createElement('div'); fd.className='form-field';
     const lbl=document.createElement('label');
     const isBuiltin=['cat','topic','diff'].includes(def.key);
-    lbl.innerHTML=`${def.name}${def.key==='cat'?' *':''} <button type="button" class="inline-add-btn" style="height:auto;padding:1px 8px;font-size:14px;" onclick="${isBuiltin?`inlineAddBuiltin('${def.key}')`:`inlineAddCustom('${def.key.replace('cf_','')}')`}">+</button>`;
+    lbl.innerHTML=`${esc(def.name)}${def.key==='cat'?' *':''} <button type="button" class="inline-add-btn" style="height:auto;padding:1px 8px;font-size:14px;" onclick="${isBuiltin?`inlineAddBuiltin('${def.key}')`:`inlineAddCustom('${def.key.replace('cf_','')}')`}">+</button>`;
     fd.appendChild(lbl);
     const ms=document.createElement('div'); ms.className='ms-wrap'; ms.id='chips_'+def.key;
     fd.appendChild(ms);
@@ -1612,8 +1641,8 @@ function makeBuiltinCard(title,colName,type,key,subtitle,wide=false){
   if(wide) card.style.gridColumn='1/-1';
   const listId='blt_'+key;
   card.innerHTML=`
-    <div class="options-card-title">${title} <span style="font-size:10px;color:var(--text3);font-weight:400;">${type==='singleselect'?'(single-select)':'(multi-select)'}</span></div>
-    <div class="options-card-sub">${subtitle}</div>
+    <div class="options-card-title">${esc(title)} <span style="font-size:10px;color:var(--text3);font-weight:400;">${type==='singleselect'?'(single-select)':'(multi-select)'}</span></div>
+    <div class="options-card-sub">${esc(subtitle)}</div>
     <div class="options-list" id="${listId}" ${wide?'style="flex-direction:row;flex-wrap:wrap;max-height:none;"':''}></div>
     <div class="options-add-row"><input type="text" id="new_${key}" placeholder="New value..." onkeydown="if(event.key==='Enter')addBuiltinValue('${colName}','${key}')"/><button onclick="addBuiltinValue('${colName}','${key}')">Add</button></div>
   `;
@@ -1625,7 +1654,7 @@ function makeCustomCard(cf){
   const listId='cst_'+cf.id;
   card.innerHTML=`
     <div class="options-card-title" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>${cf.name} <span style="font-size:10px;color:var(--text3);font-weight:400;">${cf.type==='singleselect'?'(single-select)':'(multi-select)'} · custom</span></span>
+      <span>${esc(cf.name)} <span style="font-size:10px;color:var(--text3);font-weight:400;">${cf.type==='singleselect'?'(single-select)':'(multi-select)'} · custom</span></span>
       <button class="row-btn del" onclick="deleteCustomCategory('${cf.id}')" title="Delete this category"><i class="ti ti-trash"></i></button>
     </div>
     <div class="options-card-sub">Custom category — appears in sign editor and filters.</div>
@@ -1643,11 +1672,11 @@ function renderValueRows(listId,items,wide,onRename,onDelete){
     const row=document.createElement('div');
     if(wide){
       row.style.cssText='display:flex;align-items:center;gap:4px;background:var(--bg2);border:0.5px solid var(--border);border-radius:20px;padding:3px 4px 3px 10px;';
-      row.innerHTML=`<span style="font-size:12px;">${item.value}</span><button class="option-row-del" style="width:20px;height:20px;border-radius:50%;"><i class="ti ti-x" style="font-size:11px;"></i></button>`;
+      row.innerHTML=`<span style="font-size:12px;">${esc(item.value)}</span><button class="option-row-del" style="width:20px;height:20px;border-radius:50%;"><i class="ti ti-x" style="font-size:11px;"></i></button>`;
       row.querySelector('button').onclick=()=>onDelete(item.id);
     } else {
       row.className='option-row';
-      row.innerHTML=`<input type="text" value="${item.value}"/><button class="option-row-del"><i class="ti ti-x"></i></button>`;
+      row.innerHTML=`<input type="text" value="${esc(item.value)}"/><button class="option-row-del"><i class="ti ti-x"></i></button>`;
       row.querySelector('input').onchange=(e)=>onRename(item.id,e.target.value);
       row.querySelector('button').onclick=()=>onDelete(item.id);
     }
@@ -1658,8 +1687,7 @@ function renderValueRows(listId,items,wide,onRename,onDelete){
 window.addBuiltinValue=async function(colName,key){
   const inp=document.getElementById('new_'+key);
   const val=inp.value.trim(); if(!val) return;
-  const arrMap={categories:CATEGORIES,topics:TOPICS,difficulties:DIFFICULTIES,tags:SPECIAL_TAGS};
-  const arr=arrMap[colName];
+  const arr=builtinFieldByCol(colName).arr;
   if(arr.some(x=>x.value===val)){ showToast('That value already exists.'); return; }
   const newDoc=await addValue(colName,val); if(!newDoc) return;
   arr.push(newDoc);
@@ -1672,14 +1700,12 @@ window.addBuiltinValue=async function(colName,key){
 
 window.renameBuiltinValue=async function(colName,key,id,newVal){
   newVal=newVal.trim(); if(!newVal) return;
-  const arrMap={categories:CATEGORIES,topics:TOPICS,difficulties:DIFFICULTIES,tags:SPECIAL_TAGS};
-  const arr=arrMap[colName];
+  const arr=builtinFieldByCol(colName).arr;
   const item=arr.find(x=>x.id===id); if(!item) return;
   const oldVal=item.value;
   await updateValueDoc(colName,id,{value:newVal});
   item.value=newVal;
-  const fieldMap={categories:'cat',topics:'topic',difficulties:'diff',tags:'special'};
-  const field=fieldMap[colName];
+  const field=builtinFieldByCol(colName).field;
   WORDS.forEach(w=>{
     const v=w[field];
     if(Array.isArray(v)) w[field]=v.map(x=>x===oldVal?newVal:x);
@@ -1690,8 +1716,7 @@ window.renameBuiltinValue=async function(colName,key,id,newVal){
 };
 
 window.deleteBuiltinValue=async function(colName,key,id){
-  const arrMap={categories:CATEGORIES,topics:TOPICS,difficulties:DIFFICULTIES,tags:SPECIAL_TAGS};
-  const arr=arrMap[colName];
+  const arr=builtinFieldByCol(colName).arr;
   const idx=arr.findIndex(x=>x.id===id); if(idx===-1) return;
   const removed=arr[idx].value;
   const note = isMainAdmin
@@ -1700,8 +1725,7 @@ window.deleteBuiltinValue=async function(colName,key,id){
   if(!confirm(`Delete "${removed}"?\n${note}`)) return;
   await deleteValueDoc(colName,id,removed);
   arr.splice(idx,1);
-  const fieldMap={categories:'cat',topics:'topic',difficulties:'diff',tags:'special'};
-  const field=fieldMap[colName];
+  const field=builtinFieldByCol(colName).field;
   WORDS.forEach(w=>{
     const v=w[field];
     if(Array.isArray(v)) w[field]=v.filter(x=>x!==removed);
@@ -1747,7 +1771,7 @@ window.deleteCustomCategory=async function(fieldId){
   try{
     await deleteDoc(doc(db,'customFields',fieldId));
     const opts=CUSTOM_OPTIONS.filter(o=>o.fieldId===fieldId);
-    for(const o of opts) await deleteDoc(doc(db,'customFieldOptions',o.id));
+    await Promise.all(opts.map(o=>deleteDoc(doc(db,'customFieldOptions',o.id))));
   }catch(err){ console.error(err); showToast('⚠ Could not delete category.'); showSaving(false); return; }
   showSaving(false);
   CUSTOM_FIELDS=CUSTOM_FIELDS.filter(f=>f.id!==fieldId);
@@ -1816,9 +1840,7 @@ window.inlineAddBuiltin=async function(key){
   const labels={cat:'category',topic:'topic',diff:'difficulty',tag:'tag',hand:'handshape'};
   const val=prompt(`New ${labels[key]||key}:`); if(!val?.trim()) return;
   const v=val.trim();
-  const colMap={cat:'categories',topic:'topics',diff:'difficulties',tag:'tags',hand:'handshapes'};
-  const arrMap={cat:CATEGORIES,topic:TOPICS,diff:DIFFICULTIES,tag:SPECIAL_TAGS,hand:HANDSHAPES};
-  const colName=colMap[key], arr=arrMap[key];
+  const {col:colName,arr}=builtinFieldByKey(key);
   if(arr.some(x=>x.value===v)){ showToast('That value already exists.'); return; }
   const newDoc=await addValue(colName,v); if(!newDoc) return;
   arr.push(newDoc);
@@ -1961,17 +1983,17 @@ window.renderFeedbackAdmin=async function(){
     const date=f.ts?new Date(f.ts).toLocaleString():'';
     const name=f.displayName||'Anonymous (quick rating)';
     const pubBadge=f.text ? (f.isPublic?`<span class="fb-badge" style="background:var(--success-light);color:var(--success);">Public</span>`:`<span class="fb-badge">Private</span>`) : '';
-    const reply=f.teamReply?`<div class="fb-team-reply"><div class="fb-team-reply-header"><i class="ti ti-shield-check" style="margin-right:3px;"></i>Response from the team</div><div class="fb-team-reply-text">${f.teamReply}</div></div>`:'';
+    const reply=f.teamReply?`<div class="fb-team-reply"><div class="fb-team-reply-header"><i class="ti ti-shield-check" style="margin-right:3px;"></i>Response from the team</div><div class="fb-team-reply-text">${esc(f.teamReply)}</div></div>`:'';
     return `<div class="fb-card">
       <div class="fb-card-header">
-        <span style="font-size:12px;font-weight:600;">${name}</span>
+        <span style="font-size:12px;font-weight:600;">${esc(name)}</span>
         ${stars?`<span class="fb-stars">${stars}</span>`:''}
-        <span class="fb-badge">${f.type||'Other'}</span>
+        <span class="fb-badge">${esc(f.type||'Other')}</span>
         ${pubBadge}
-        ${f.signName?`<span class="fb-sign-ref">Re: ${f.signName}</span>`:'<span class="fb-sign-ref">General</span>'}
+        ${f.signName?`<span class="fb-sign-ref">Re: ${esc(f.signName)}</span>`:'<span class="fb-sign-ref">General</span>'}
         <button class="fb-del-btn" onclick="deleteFeedback('${f.id}')"><i class="ti ti-trash"></i></button>
       </div>
-      ${f.text?`<p class="fb-card-text">${f.text}</p>`:''}
+      ${f.text?`<p class="fb-card-text">${esc(f.text)}</p>`:''}
       ${reply}
       <div class="row-actions" style="margin-top:8px;">
         ${f.text ? (f.isPublic
