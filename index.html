@@ -487,7 +487,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 <div class="toast" id="toast"></div>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, addDoc, query, orderBy, onSnapshot }
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, addDoc, query, orderBy, onSnapshot, writeBatch }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
@@ -1906,13 +1906,9 @@ function renderHsMgGrid(){
   });
 }
 
-// Move dragId to just before targetId in HANDSHAPES, persist new order to Firestore
+// Move dragId to just before targetId in HANDSHAPES, persist new order to Firestore.
 // Reordering is a display-only change with no content risk, so it bypasses
 // the review queue entirely for both Main Admin and staff — it writes straight through.
-async function updateOrderDirect(colName, id, order){
-  try{ await setDoc(doc(db,colName,id), {order}, {merge:true}); }
-  catch(err){ console.error('updateOrderDirect failed:',err); }
-}
 
 async function reorderHandshapes(dragId, targetId){
   const srcIdx=HANDSHAPES.findIndex(h=>h.id===dragId);
@@ -1921,13 +1917,14 @@ async function reorderHandshapes(dragId, targetId){
   const [moved]=HANDSHAPES.splice(srcIdx,1);
   const newTgtIdx=HANDSHAPES.findIndex(h=>h.id===targetId);
   HANDSHAPES.splice(newTgtIdx,0,moved);
-  // Persist sequential order values for all handshapes
+  // Persist sequential order values for all handshapes in one network
+  // round-trip instead of one write per item — same result, far fewer
+  // requests (and Firestore write-quota usage) as the list grows.
   showSaving(true);
   try{
-    for(let i=0;i<HANDSHAPES.length;i++){
-      HANDSHAPES[i].order=i;
-      await updateOrderDirect('handshapes',HANDSHAPES[i].id,i);
-    }
+    const batch=writeBatch(db);
+    HANDSHAPES.forEach((h,i)=>{ h.order=i; batch.set(doc(db,'handshapes',h.id), {order:i}, {merge:true}); });
+    await batch.commit();
   }catch(err){ console.error(err); showToast('⚠ Could not save new order.'); }
   showSaving(false);
   buildHsGrid(); renderHsMgGrid(); buildFilterPanel();
@@ -1991,7 +1988,7 @@ window.renderFeedbackAdmin=async function(){
         <span class="fb-badge">${esc(f.type||'Other')}</span>
         ${pubBadge}
         ${f.signName?`<span class="fb-sign-ref">Re: ${esc(f.signName)}</span>`:'<span class="fb-sign-ref">General</span>'}
-        <button class="fb-del-btn" onclick="deleteFeedback('${f.id}')"><i class="ti ti-trash"></i></button>
+        <button class="fb-del-btn" onclick="deleteFeedback('${f.id}','${f.signId||''}')"><i class="ti ti-trash"></i></button>
       </div>
       ${f.text?`<p class="fb-card-text">${esc(f.text)}</p>`:''}
       ${reply}
