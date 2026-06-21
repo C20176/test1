@@ -401,8 +401,21 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 
 <div class="page" id="pageAbout">
   <div style="max-width:600px;margin:40px auto;background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;">
-    <h2 style="font-size:20px;font-weight:500;margin-bottom:8px;">About SignBiz</h2>
-    <p style="color:var(--text2);line-height:1.7;margin-bottom:12px;">SignBiz is a business sign language dictionary for Deaf and hard-of-hearing students.</p>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+      <h2 id="aboutTitleView" style="font-size:20px;font-weight:500;margin-bottom:8px;">About SignBiz</h2>
+      <button class="row-btn" id="aboutEditBtn" style="display:none;flex-shrink:0;" onclick="enterAboutEdit()"><i class="ti ti-edit"></i> Edit</button>
+    </div>
+    <div id="aboutBodyView" style="color:var(--text2);line-height:1.7;margin-bottom:12px;white-space:pre-wrap;">SignBiz is a business sign language dictionary for Deaf and hard-of-hearing students.</div>
+
+    <div id="aboutEditForm" style="display:none;">
+      <div class="form-field"><label>Title</label><input type="text" id="aboutTitleInput"/></div>
+      <div class="form-field"><label>Body</label><textarea id="aboutBodyInput" style="min-height:160px;"></textarea></div>
+      <div class="form-footer" style="margin-top:6px;">
+        <button class="btn" onclick="cancelAboutEdit()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveAboutContent()">Save</button>
+      </div>
+    </div>
+
     <button class="btn" style="margin-top:16px;" onclick="showPage('dict')"><i class="ti ti-arrow-left"></i> Back to dictionary</button>
   </div>
 </div>
@@ -646,6 +659,62 @@ function resolveDisplayName(){
   return nick || currentUser.displayName || 'Anonymous';
 }
 
+/* ══ ABOUT PAGE CONTENT (siteContent/about) — admin-editable, public-readable ══ */
+let ABOUT_CONTENT={
+  title:'About SignBiz',
+  body:'SignBiz is a business sign language dictionary for Deaf and hard-of-hearing students.'
+};
+
+async function loadAboutContent(){
+  try{
+    const snap=await getDoc(doc(db,'siteContent','about'));
+    if(snap.exists()){
+      const d=snap.data();
+      if(d.title) ABOUT_CONTENT.title=d.title;
+      if(d.body)  ABOUT_CONTENT.body=d.body;
+    }
+  }catch(err){ console.error('loadAboutContent failed:',err); }
+  renderAboutView();
+}
+
+function renderAboutView(){
+  const tEl=document.getElementById('aboutTitleView');
+  const bEl=document.getElementById('aboutBodyView');
+  if(tEl) tEl.textContent=ABOUT_CONTENT.title;
+  if(bEl) bEl.textContent=ABOUT_CONTENT.body;
+  const editBtn=document.getElementById('aboutEditBtn');
+  if(editBtn) editBtn.style.display=isAdmin?'flex':'none';
+}
+
+window.enterAboutEdit=function(){
+  document.getElementById('aboutTitleInput').value=ABOUT_CONTENT.title;
+  document.getElementById('aboutBodyInput').value=ABOUT_CONTENT.body;
+  document.getElementById('aboutTitleView').style.display='none';
+  document.getElementById('aboutBodyView').style.display='none';
+  document.getElementById('aboutEditBtn').style.display='none';
+  document.getElementById('aboutEditForm').style.display='block';
+};
+
+window.cancelAboutEdit=function(){
+  document.getElementById('aboutTitleView').style.display='';
+  document.getElementById('aboutBodyView').style.display='';
+  document.getElementById('aboutEditBtn').style.display=isAdmin?'flex':'none';
+  document.getElementById('aboutEditForm').style.display='none';
+};
+
+window.saveAboutContent=async function(){
+  const title=document.getElementById('aboutTitleInput').value.trim()||'About SignBiz';
+  const body=document.getElementById('aboutBodyInput').value.trim();
+  showSaving(true);
+  try{ await setDoc(doc(db,'siteContent','about'),{title,body},{merge:true}); }
+  catch(err){ console.error('saveAboutContent failed:',err); showToast('⚠ Could not save. Try again.'); showSaving(false); return; }
+  showSaving(false);
+  ABOUT_CONTENT.title=title; ABOUT_CONTENT.body=body;
+  renderAboutView();
+  cancelAboutEdit();
+  showToast('About page updated');
+};
+
 async function loadFeedback(){
   try{
     const snap = await getDocs(query(collection(db,'feedback'), orderBy('ts','desc')));
@@ -709,6 +778,7 @@ onAuthStateChanged(auth, async user=>{
   // Refresh detail panel (feedback box depends on login state) and admin tables
   if(activeWord){ const w=WORDS.find(x=>x.id===activeWord); if(w) renderDetail(w); }
   if(document.getElementById('pageAdmin').classList.contains('active')) renderAdminTable();
+  renderAboutView();
 });
 
 /* ══ PAGE ROUTING ══ */
@@ -1665,6 +1735,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeFsModal(); c
 async function init(){
   try{ await loadAll(); }
   catch(e){ console.error(e); showToast('⚠ Firebase connection error. Check your config and Firestore rules.'); }
+  await loadAboutContent();
   document.getElementById('appLoading').style.display='none';
   document.getElementById('mainHeader').style.display='flex';
   buildFilterPanel(); buildFilterTags(); buildHsGrid(); doFilter();
