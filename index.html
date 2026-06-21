@@ -405,9 +405,10 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 
   <div class="admin-tab-panel" id="apFeedback">
     <div class="fb-admin-wrap">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">Ratings and written comments are stored separately now — ratings feed the public star average on each sign (and aren't moderatable, just a tally), while comments are what gets approved/replied to below.</p>
+      <div id="fbRatingsOverview" style="margin-bottom:18px;"></div>
       <div class="fb-admin-filters">
         <select id="fbFilterType" onchange="renderFeedbackAdmin()"><option value="">All types</option><option>Bug</option><option>Suggestion</option><option>Other</option></select>
-        <select id="fbFilterStars" onchange="renderFeedbackAdmin()"><option value="">All ratings</option><option value="5">5 ★</option><option value="4">4 ★</option><option value="3">3 ★</option><option value="2">2 ★</option><option value="1">1 ★</option></select>
         <button class="btn" onclick="renderFeedbackAdmin()"><i class="ti ti-refresh"></i> Refresh</button>
       </div>
       <div id="fbAdminList"><p style="color:var(--text3);font-size:13px;">Loading feedback...</p></div>
@@ -496,7 +497,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 <div class="toast" id="toast"></div>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, addDoc, query, orderBy, onSnapshot, writeBatch }
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, addDoc, query, where, orderBy, onSnapshot, writeBatch }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
@@ -535,14 +536,15 @@ let SPECIAL_TAGS  = [];   // tags/{id} → {value}
 let HANDSHAPES    = [];   // handshapes/{id} → {value, image?}
 let CUSTOM_FIELDS = [];   // customFields/{id} → {name, type}
 let CUSTOM_OPTIONS= [];   // customFieldOptions/{id} → {fieldId, value}
-let FEEDBACKS     = [];   // feedback/{id}
+let FEEDBACKS     = [];   // feedback/{id} — comment/text side only (no rating field)
+let FEEDBACK_RATINGS = []; // feedbackRatings/{id} — rating-only, public-readable, used for averages
 let dataLoadedPromise = null; // resolves once loadAll() has populated the arrays above
 
 let activeAZ=null, activeSpecial=[], activeWord=null, activeVideoType='how';
 let editingId=null, deletingId=null, editFormSpecial=[], editFormValues={};
 let currentLang='en', currentUser=null;
 let fbRating=0, fbType='';
-let feedbackBySign={}; // signId → array of feedback docs (cached after first load per sign)
+let feedbackBySign={}; // signId → {comments:[...], ratings:[...]} (cached after first load per sign)
 let isAdmin=false; // determined by checking admins/{email} collection after login
 let isMainAdmin=false; // true only if admins/{email}.role === 'main'
 let adminName=''; // display name from admins/{email}.name, falls back to email
@@ -997,21 +999,51 @@ window.saveAboutContent=async function(){
 };
 
 async function loadFeedback(){
+  // Admin-only view: reads both collections. feedback read is allowed here
+  // because isAdmin()==true bypasses the isPublic gate in the rules.
   try{
-    const snap = await getDocs(query(collection(db,'feedback'), orderBy('ts','desc')));
-    FEEDBACKS = snap.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(err){ console.error('loadFeedback failed (check Firestore rules):', err); FEEDBACKS=[]; }
+    const [fSnap, rSnap] = await Promise.all([
+      getDocs(query(collection(db,'feedback'), orderBy('ts','desc'))),
+      getDocs(query(collection(db,'feedbackRatings'), orderBy('ts','desc'))),
+    ]);
+    FEEDBACKS = fSnap.docs.map(d=>({id:d.id,...d.data()}));
+    FEEDBACK_RATINGS = rSnap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(err){ console.error('loadFeedback failed (check Firestore rules):', err); FEEDBACKS=[]; FEEDBACK_RATINGS=[]; }
 }
 
-// Load feedback for one sign (ratings always loaded for average; comments shown
-// only if isPublic, except admins see everything)
+// Load feedback for one sign: ratings (always fully visible — that collection
+// has nothing private in it) and comments (text, name, isPublic, teamReply —
+// the rules hide anything with isPublic!=true unless the caller is an admin,
+// so a logged-out guest's query here only ever returns what's actually safe
+// to show; no client-side filtering is doing the privacy enforcement anymore).
+// Uses where('signId','==',signId) on both queries so this only ever reads
+// the docs for THIS sign, instead of downloading the entire collection and
+// filtering client-side — that approach re-fetched every comment/rating on
+// every sign in the dictionary each time a user clicked a new word, which
+// gets slower (and costs more Firestore reads) as feedback accumulates.
+// NOTE: combining where('signId','==',...) with orderBy('ts','desc') needs a
+// composite index for EACH of the two collections below. Firestore will
+// throw on first use of each, with a console error containing a direct
+// "create it here" link — click each one once and the queries work from
+// then on. (No code change needed; just visit the links.)
 async function loadFeedbackForSign(signId){
   try{
-    const snap = await getDocs(query(collection(db,'feedback'), orderBy('ts','desc')));
-    const all = snap.docs.map(d=>({id:d.id,...d.data()})).filter(f=>f.signId===signId);
-    feedbackBySign[signId]=all;
-    return all;
-  }catch(err){ console.error('loadFeedbackForSign failed:',err); feedbackBySign[signId]=[]; return []; }
+    const [fSnap, rSnap] = await Promise.all([
+      getDocs(query(collection(db,'feedback'), where('signId','==',signId), orderBy('ts','desc'))),
+      getDocs(query(collection(db,'feedbackRatings'), where('signId','==',signId), orderBy('ts','desc'))),
+    ]);
+    const result = {
+      comments: fSnap.docs.map(d=>({id:d.id,...d.data()})),
+      ratings: rSnap.docs.map(d=>({id:d.id,...d.data()})),
+    };
+    feedbackBySign[signId]=result;
+    return result;
+  }catch(err){
+    console.error('loadFeedbackForSign failed:',err);
+    const empty={comments:[],ratings:[]};
+    feedbackBySign[signId]=empty;
+    return empty;
+  }
 }
 
 /* ══ AUTH ══ */
@@ -1267,21 +1299,24 @@ function renderDetail(w){
 
 /* ══ FEEDBACK SECTION (rating average + public comments + comment box) ══ */
 function renderFeedbackSection(w){
-  const list = feedbackBySign[w.id] || [];
-  const rated = list.filter(f=>f.rating>0);
-  const avg = rated.length ? (rated.reduce((s,f)=>s+f.rating,0)/rated.length) : 0;
+  const cached = feedbackBySign[w.id] || {comments:[],ratings:[]};
+  const ratings = cached.ratings;
+  // Comments: no client-side isPublic filtering needed anymore — the
+  // Firestore rule (`isAdmin() || isPublic==true`) already kept anything
+  // a non-admin shouldn't see out of the query result entirely. Admins'
+  // queries return everything because isAdmin() short-circuits the rule.
+  const comments = cached.comments;
+
+  const avg = ratings.length ? (ratings.reduce((s,r)=>s+r.rating,0)/ratings.length) : 0;
   const avgRounded = Math.round(avg*10)/10;
 
   const avgStars = avg>0
     ? `<span class="fb-avg-stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5-Math.round(avg))}</span>
        <span class="fb-avg-num">${avgRounded}</span>
-       <span class="fb-avg-count">(${rated.length} rating${rated.length===1?'':'s'})</span>`
+       <span class="fb-avg-count">(${ratings.length} rating${ratings.length===1?'':'s'})</span>`
     : `<span class="fb-avg-count">No ratings yet — be the first!</span>`;
 
-  // Public comments (visible to everyone). Admins also see private ones, clearly marked.
-  const visibleComments = isAdmin ? list.filter(f=>f.text) : list.filter(f=>f.text && f.isPublic);
-  const commentsHtml = visibleComments.map(f=>{
-    const stars = f.rating ? `<span class="fb-comment-stars">${'★'.repeat(f.rating)}${'☆'.repeat(5-f.rating)}</span>` : '';
+  const commentsHtml = comments.map(f=>{
     const date = f.ts ? new Date(f.ts).toLocaleDateString() : '';
     const name = f.displayName || 'Anonymous';
     const privacyBadge = !f.isPublic ? `<span class="fb-badge" style="background:var(--bg2);color:var(--text3);">Private</span>` : '';
@@ -1297,7 +1332,7 @@ function renderFeedbackSection(w){
         <button class="fb-mini-btn danger" onclick="deleteFeedback('${f.id}','${w.id}')"><i class="ti ti-trash"></i> Delete</button>
       </div>` : '';
     return `<div class="fb-comment">
-      <div class="fb-comment-header"><span class="fb-comment-name">${esc(name)}</span>${stars}${privacyBadge}<span class="fb-comment-date">${date}</span></div>
+      <div class="fb-comment-header"><span class="fb-comment-name">${esc(name)}</span>${privacyBadge}<span class="fb-comment-date">${date}</span></div>
       <div class="fb-comment-text">${esc(f.text)}</div>
       ${reply}
       ${adminActions}
@@ -1389,16 +1424,24 @@ window.submitFeedback=async function(wId){
   if(!fbRating&&!text){ showToast('Please add a rating or comment.'); return; }
   const w=WORDS.find(x=>x.id===wId);
   const displayName=resolveDisplayName();
-  try{
-    await addDoc(collection(db,'feedback'),{
-      signId:wId, signName:w?.en||'',
-      rating:fbRating, type:fbType||'Other', text,
-      displayName, // chosen nickname or Anonymous_#### — email intentionally NOT stored
-      isPublic:false, // private by default; admin can make public
-      teamReply:'',
-      ts:Date.now()
-    });
-  }catch(err){
+  // Rating and comment text are written to two different collections now
+  // (see Firestore rules: feedbackRatings is public-readable for the
+  // average-star display, feedback holds the text and stays private
+  // unless an admin publishes it). Fire both writes together; either can
+  // be skipped if the user didn't provide that part (e.g. comment with no
+  // star, or — via quickRate — a star with no comment).
+  const writes=[];
+  if(fbRating) writes.push(addDoc(collection(db,'feedbackRatings'),{ signId:wId, rating:fbRating, ts:Date.now() }));
+  if(text) writes.push(addDoc(collection(db,'feedback'),{
+    signId:wId, signName:w?.en||'',
+    type:fbType||'Other', text,
+    displayName, // chosen nickname or Anonymous_#### — email intentionally NOT stored
+    isPublic:false, // private by default; admin can make public
+    teamReply:'',
+    ts:Date.now()
+  }));
+  try{ await Promise.all(writes); }
+  catch(err){
     console.error('Feedback submit failed:',err);
     showToast('⚠ Could not send feedback — please try again later.');
     return;
@@ -1426,7 +1469,7 @@ window.quickRate=async function(n,wId){
   if(hasRatedBefore(wId)){ showToast('You already rated this sign on this device.'); return; }
   const w=WORDS.find(x=>x.id===wId);
   try{
-    await addDoc(collection(db,'feedback'),{ signId:wId, signName:w?.en||'', rating:n, type:'Other', text:'', displayName:'', isPublic:false, teamReply:'', ts:Date.now() });
+    await addDoc(collection(db,'feedbackRatings'),{ signId:wId, rating:n, ts:Date.now() });
   }catch(err){
     console.error('Quick rate failed:',err);
     showToast('⚠ Could not save rating — please try again later.');
@@ -1443,7 +1486,7 @@ window.quickRate=async function(n,wId){
 // (feedbackBySign is only populated for signs the user has viewed in
 // the dictionary; the admin panel works off the global FEEDBACKS list).
 function findFeedbackItem(signId, feedbackId){
-  const fromSign = (feedbackBySign[signId]||[]).find(f=>f.id===feedbackId);
+  const fromSign = (feedbackBySign[signId]?.comments||[]).find(f=>f.id===feedbackId);
   if(fromSign) return fromSign;
   return FEEDBACKS.find(f=>f.id===feedbackId);
 }
@@ -2021,35 +2064,51 @@ window.addHandshape=async function(){
 };
 
 /* ══ FEEDBACK ADMIN ══ */
+// Small per-sign tally of FEEDBACK_RATINGS — not moderatable (ratings can't
+// be edited or deleted per the Firestore rules), just a readout so admins
+// can see where the public star average is coming from.
+function renderRatingsOverview(){
+  const el=document.getElementById('fbRatingsOverview'); if(!el) return;
+  if(!FEEDBACK_RATINGS.length){ el.innerHTML='<p style="font-size:12px;color:var(--text3);">No ratings yet.</p>'; return; }
+  const bySign={};
+  FEEDBACK_RATINGS.forEach(r=>{ (bySign[r.signId]=bySign[r.signId]||[]).push(r.rating); });
+  const rows=Object.entries(bySign).map(([signId,nums])=>{
+    const w=WORDS.find(x=>x.id===signId);
+    const avg=nums.reduce((a,b)=>a+b,0)/nums.length;
+    return {name:w?.en||'(deleted sign)', avg, count:nums.length};
+  }).sort((a,b)=>b.count-a.count);
+  el.innerHTML=`<div class="admin-table-wrap" style="padding:0;"><table class="admin-table"><thead><tr><th>Sign</th><th>Avg rating</th><th>Count</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${'★'.repeat(Math.round(r.avg))}${'☆'.repeat(5-Math.round(r.avg))} ${(Math.round(r.avg*10)/10)}</td><td>${r.count}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
 window.renderFeedbackAdmin=async function(){
   await loadFeedback();
+  renderRatingsOverview();
   const typeF=document.getElementById('fbFilterType')?.value||'';
-  const starF=document.getElementById('fbFilterStars')?.value||'';
-  const list=FEEDBACKS.filter(f=>{ if(typeF&&f.type!==typeF) return false; if(starF&&String(f.rating)!==starF) return false; return true; });
+  const list=FEEDBACKS.filter(f=>{ if(typeF&&f.type!==typeF) return false; return true; });
   const el=document.getElementById('fbAdminList');
-  if(!list.length){ el.innerHTML='<p style="color:var(--text3);font-size:13px;">No feedback yet.</p>'; return; }
+  if(!list.length){ el.innerHTML='<p style="color:var(--text3);font-size:13px;">No comments yet.</p>'; return; }
   el.innerHTML=list.map(f=>{
-    const stars=f.rating?('★'.repeat(f.rating)+'☆'.repeat(5-f.rating)):'';
     const date=f.ts?new Date(f.ts).toLocaleString():'';
-    const name=f.displayName||'Anonymous (quick rating)';
-    const pubBadge=f.text ? (f.isPublic?`<span class="fb-badge" style="background:var(--success-light);color:var(--success);">Public</span>`:`<span class="fb-badge">Private</span>`) : '';
+    const name=f.displayName||'Anonymous';
+    const pubBadge=f.isPublic?`<span class="fb-badge" style="background:var(--success-light);color:var(--success);">Public</span>`:`<span class="fb-badge">Private</span>`;
     const reply=f.teamReply?`<div class="fb-team-reply"><div class="fb-team-reply-header"><i class="ti ti-shield-check" style="margin-right:3px;"></i>Response from the team</div><div class="fb-team-reply-text">${esc(f.teamReply)}</div></div>`:'';
     return `<div class="fb-card">
       <div class="fb-card-header">
         <span style="font-size:12px;font-weight:600;">${esc(name)}</span>
-        ${stars?`<span class="fb-stars">${stars}</span>`:''}
         <span class="fb-badge">${esc(f.type||'Other')}</span>
         ${pubBadge}
         ${f.signName?`<span class="fb-sign-ref">Re: ${esc(f.signName)}</span>`:'<span class="fb-sign-ref">General</span>'}
         <button class="fb-del-btn" onclick="deleteFeedback('${f.id}','${f.signId||''}')"><i class="ti ti-trash"></i></button>
       </div>
-      ${f.text?`<p class="fb-card-text">${esc(f.text)}</p>`:''}
+      <p class="fb-card-text">${esc(f.text)}</p>
       ${reply}
       <div class="row-actions" style="margin-top:8px;">
-        ${f.text ? (f.isPublic
+        ${f.isPublic
           ? `<button class="row-btn" onclick="toggleFeedbackPublic('${f.signId}','${f.id}',false).then(renderFeedbackAdmin)"><i class="ti ti-eye-off"></i> Hide</button>`
-          : `<button class="row-btn" onclick="toggleFeedbackPublic('${f.signId}','${f.id}',true).then(renderFeedbackAdmin)"><i class="ti ti-eye"></i> Make public</button>`) : ''}
-        ${f.text ? `<button class="row-btn" onclick="openTeamReplyPrompt('${f.signId}','${f.id}').then(renderFeedbackAdmin)"><i class="ti ti-message-reply"></i> ${f.teamReply?'Edit reply':'Reply'}</button>` : ''}
+          : `<button class="row-btn" onclick="toggleFeedbackPublic('${f.signId}','${f.id}',true).then(renderFeedbackAdmin)"><i class="ti ti-eye"></i> Make public</button>`}
+        <button class="row-btn" onclick="openTeamReplyPrompt('${f.signId}','${f.id}').then(renderFeedbackAdmin)"><i class="ti ti-message-reply"></i> ${f.teamReply?'Edit reply':'Reply'}</button>
       </div>
       <p class="fb-card-meta">${date}</p>
     </div>`;
@@ -2058,7 +2117,8 @@ window.renderFeedbackAdmin=async function(){
 window.deleteFeedback=async function(id,signId){
   await deleteDoc(doc(db,'feedback',id));
   showToast('Feedback deleted');
-  if(signId && feedbackBySign[signId]) feedbackBySign[signId]=feedbackBySign[signId].filter(f=>f.id!==id);
+  FEEDBACKS = FEEDBACKS.filter(f=>f.id!==id);
+  if(signId && feedbackBySign[signId]) feedbackBySign[signId].comments=feedbackBySign[signId].comments.filter(f=>f.id!==id);
   if(document.getElementById('pageAdmin').classList.contains('active')) renderFeedbackAdmin();
   if(activeWord){ const w=WORDS.find(x=>x.id===activeWord); if(w) renderDetail(w); }
 };
