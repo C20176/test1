@@ -1075,20 +1075,29 @@ window.quickRate=async function(n,wId){
 };
 
 /* ══ ADMIN FEEDBACK MODERATION (on the sign detail panel) ══ */
+// Finds a feedback item by id from whichever cache currently has it
+// (feedbackBySign is only populated for signs the user has viewed in
+// the dictionary; the admin panel works off the global FEEDBACKS list).
+function findFeedbackItem(signId, feedbackId){
+  const fromSign = (feedbackBySign[signId]||[]).find(f=>f.id===feedbackId);
+  if(fromSign) return fromSign;
+  return FEEDBACKS.find(f=>f.id===feedbackId);
+}
+
 window.toggleFeedbackPublic=async function(signId,feedbackId,makePublic){
   showSaving(true);
   try{ await setDoc(doc(db,'feedback',feedbackId),{isPublic:makePublic},{merge:true}); }
   catch(err){ console.error(err); showToast('⚠ Could not update.'); showSaving(false); return; }
   showSaving(false);
-  const list=feedbackBySign[signId]||[];
-  const item=list.find(f=>f.id===feedbackId); if(item) item.isPublic=makePublic;
+  const item=findFeedbackItem(signId,feedbackId);
+  if(item) item.isPublic=makePublic;
   const w=WORDS.find(x=>x.id===signId); if(w) renderDetail(w);
   showToast(makePublic?'Comment made public':'Comment hidden');
 };
 
 window.openTeamReplyPrompt=async function(signId,feedbackId){
-  const list=feedbackBySign[signId]||[];
-  const item=list.find(f=>f.id===feedbackId); if(!item) return;
+  const item=findFeedbackItem(signId,feedbackId);
+  if(!item){ showToast('⚠ Could not find that feedback — try refreshing.'); return; }
   const val=prompt('Response from the team:', item.teamReply||'');
   if(val===null) return;
   showSaving(true);
