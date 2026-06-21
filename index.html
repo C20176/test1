@@ -128,7 +128,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .feedback-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
 .star-row{display:flex;gap:4px;margin-bottom:10px;}
 .star{font-size:22px;cursor:pointer;color:var(--border2);user-select:none;}
-.star.on,.star:hover{color:#F59E0B;}
+.star.on{color:#F59E0B;}
 .fb-type-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
 .fb-type{font-size:11px;padding:4px 10px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;}
 .fb-type.on{background:var(--accent);color:white;border-color:var(--accent);}
@@ -901,16 +901,24 @@ function renderFeedbackSection(w){
          <span class="fb-success" id="fbSuccess_${w.id}"><i class="ti ti-circle-check"></i> Thank you!</span>
        </div>
        <p class="fb-privacy-note"><i class="ti ti-lock" style="margin-right:3px;"></i>Your comment is private by default. Our team may choose to make helpful comments public for discussion. Only your name and comment are ever shown — never your email.</p>`
-    : `<div class="fb-guest-login">
+    : (hasRatedBefore(w.id)
+       ? `<div class="fb-guest-login">
+            <p><i class="ti ti-circle-check" style="color:var(--success);margin-right:4px;"></i>You've already rated this sign on this device. Thanks!</p>
+            <button class="google-btn" style="margin-top:8px;" onclick="loginGoogleForComment('${w.id}')">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Sign in with Google to leave a comment
+            </button>
+          </div>`
+       : `<div class="fb-guest-login">
          <p>Rate this sign with stars right away, or sign in with Google to leave a written comment.</p>
          <div class="star-row" id="starRow_${w.id}" style="justify-content:center;">
-           ${[1,2,3,4,5].map(n=>`<span class="star" onclick="quickRate(${n},'${w.id}')">★</span>`).join('')}
+           ${[1,2,3,4,5].map(n=>`<span class="star" onclick="quickRate(${n},'${w.id}')" onmouseover="hoverStars(${n},'${w.id}')" onmouseout="resetStarHover('${w.id}')">★</span>`).join('')}
          </div>
          <button class="google-btn" style="margin-top:8px;" onclick="loginGoogleForComment('${w.id}')">
            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
            Sign in with Google to comment
          </button>
-       </div>`;
+       </div>`);
 
   return `
     <div class="feedback-title"><i class="ti ti-message-circle"></i> Feedback</div>
@@ -962,7 +970,16 @@ window.submitFeedback=async function(wId){
 };
 
 // Quick star-only rating for guests who aren't signed in (no comment, no name needed)
+function hasRatedBefore(wId){
+  try{ return localStorage.getItem('signbiz_rated_'+wId)==='1'; }
+  catch(e){ return false; }
+}
+function markRated(wId){
+  try{ localStorage.setItem('signbiz_rated_'+wId,'1'); }catch(e){}
+}
+
 window.quickRate=async function(n,wId){
+  if(hasRatedBefore(wId)){ showToast('You already rated this sign on this device.'); return; }
   const w=WORDS.find(x=>x.id===wId);
   try{
     await addDoc(collection(db,'feedback'),{ signId:wId, signName:w?.en||'', rating:n, type:'Other', text:'', displayName:'', isPublic:false, teamReply:'', ts:Date.now() });
@@ -971,6 +988,7 @@ window.quickRate=async function(n,wId){
     showToast('⚠ Could not save rating — please try again later.');
     return;
   }
+  markRated(wId);
   await loadFeedbackForSign(wId);
   if(activeWord===wId) renderDetail(w);
   showToast('Thanks for rating!');
