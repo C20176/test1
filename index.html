@@ -332,6 +332,128 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .cf-landing-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);margin-top:8px;cursor:pointer;user-select:none;}
 .cf-landing-toggle input{cursor:pointer;}
 ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px;}
+
+/* ══ Mobile-only elements: hidden by default on desktop ══ */
+.mobile-menu-btn,.mobile-search-btn{display:none;background:none;border:none;color:white;font-size:20px;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--r-md);cursor:pointer;flex-shrink:0;}
+.mobile-menu-btn:hover,.mobile-search-btn:hover{background:rgba(255,255,255,0.12);}
+.mobile-search-bar{display:none;}
+.mobile-nav-overlay{display:none;}
+.mobile-back-bar{display:none;}
+
+/* ══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — student-facing pages only (topics, dict, about).
+   Admin/login pages intentionally keep their desktop layout: this
+   tool is meant to be managed from a computer, not a phone.
+   ══════════════════════════════════════════════════════════ */
+@media (max-width: 768px){
+
+  /* ── Header: logo + hamburger + search icon, nav becomes a drawer ── */
+  .header{padding:0 10px;gap:6px;}
+  .mobile-menu-btn,.mobile-search-btn{display:flex;}
+  .header-logo{margin-right:auto;gap:7px;padding:10px 0;}
+  .header-logo i{font-size:19px;}
+  .header-logo-text{font-size:13px;}
+  .header-logo-sub{font-size:8px;}
+  .header-nav{
+    display:none;
+  }
+  .header-nav.mobile-open{
+    display:flex;flex-direction:column;align-items:stretch;
+    position:fixed;top:0;left:0;bottom:0;width:78vw;max-width:300px;
+    background:var(--accent);z-index:401;flex:none;
+    padding-top:56px;overflow-y:auto;
+    box-shadow:4px 0 24px rgba(0,0,0,0.25);
+  }
+  .header-nav.mobile-open .nav-item{
+    padding:13px 20px;border-bottom:0.5px solid rgba(255,255,255,0.12);
+    border-bottom-width:0.5px;justify-content:flex-start;
+  }
+  .header-nav.mobile-open .nav-item.active{border-bottom-color:rgba(255,255,255,0.12);background:rgba(255,255,255,0.1);}
+  .mobile-nav-overlay.show{display:block;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:400;}
+  .header-search{display:none;}
+  .mobile-search-bar{
+    display:none;align-items:center;gap:8px;background:var(--bg);
+    border-bottom:0.5px solid var(--border);padding:10px 14px;
+  }
+  .mobile-search-bar.show{display:flex;}
+  .mobile-search-bar i{color:var(--text3);font-size:15px;}
+  .mobile-search-bar input{flex:1;border:none;outline:none;background:transparent;font-size:14px;color:var(--text);padding:6px 0;}
+  .lang-toggle{margin-left:0;}
+  .lang-btn{padding:4px 8px;}
+  .header-right{margin-left:6px;gap:6px;}
+  .header-user span,.hdr-btn span{display:none;}
+  .hdr-btn{padding:7px 9px;}
+  .es-notice-pop{width:min(300px,84vw);right:-40px;}
+
+  /* ── Handshape strip: horizontal scroll instead of wrap ── */
+  .hs-strip{padding-bottom:12px;}
+  .hs-grid{padding:0 14px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .hs-grid::-webkit-scrollbar{display:none;}
+  .hs-cell{width:44px;height:44px;}
+  .hs-all{padding:10px 14px 0;}
+  .hs-label{display:none;}
+
+  /* ── Dictionary page: stack list + detail, toggle visibility ── */
+  .main-layout{
+    grid-template-columns:1fr;
+    min-height:calc(100vh - 116px);
+  }
+  .left{
+    border-right:none;
+  }
+  .right-wrap{display:none;}
+  /* When a sign is selected, show detail full-width and hide the list */
+  .main-layout.mobile-detail-active .left{display:none;}
+  .main-layout.mobile-detail-active .right-wrap{display:flex;}
+  .mobile-back-bar.show{
+    display:flex;background:var(--bg);border-bottom:0.5px solid var(--border);
+    padding:10px 14px;flex-shrink:0;
+  }
+  .mobile-back-btn{
+    display:flex;align-items:center;gap:6px;font-size:13px;color:var(--accent);
+    background:none;border:none;cursor:pointer;padding:4px 0;font-weight:500;
+  }
+  .dict-context-bar{padding:14px 16px 4px;gap:10px;flex-wrap:wrap;}
+  .dict-context-title{font-size:20px;}
+  .right{padding:14px;}
+  .detail-card{padding:18px 16px;max-width:none;}
+  .entry-en{font-size:19px;}
+  .vid-tab span{display:none;}
+  .vid-tab{padding:10px 6px;}
+  .rv-vid-row{flex-direction:column;}
+  .rv-vid-cell{min-width:0;}
+
+  .left-top{padding:10px 12px;}
+  .word-row{padding:11px 14px;}
+  .adv-panel{padding:12px;}
+  .options-wrap,.form-grid{grid-template-columns:1fr;}
+
+  /* ── Topics landing & category-options pages ── */
+  .topics-wrap{padding:20px 14px 40px;}
+  .topics-hero h1{font-size:21px;}
+  .topics-hero-edit-btn{position:static;display:block;margin:0 auto 12px;}
+  .topics-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
+  .topic-card{padding:14px;}
+  .topic-card-name{font-size:13px;}
+  .topic-card-desc{display:none;}
+
+  /* ── Modals: full-bleed on small screens ── */
+  .modal-box{width:94vw;padding:16px;}
+  .modal-video{width:92vw;}
+
+  /* ── About page ── */
+  #pageAbout > div{margin:16px auto;padding:20px 18px;width:calc(100% - 32px);}
+}
+
+/* Admin & login pages are excluded from the mobile layout above —
+   they keep the desktop grid/table layout at any width, since
+   dictionary management is meant to be done on a computer. A horizontal
+   scroll keeps wide admin tables usable in a pinch on mobile, without
+   trying to actually redesign the admin UI for touch. */
+@media (max-width: 768px){
+  .admin-table-wrap{overflow-x:auto;}
+  .admin-table{min-width:760px;}
+}
 </style>
 </head>
 <body>
@@ -363,9 +485,11 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 </div>
 
 <header class="header" id="mainHeader" style="display:none;">
+  <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()" aria-label="Menu"><i class="ti ti-menu-2"></i></button>
   <div class="header-logo"><i class="ti ti-hand-finger"></i><div><div class="header-logo-text">SignBiz</div><div class="header-logo-sub">Business Sign Language</div></div></div>
   <nav class="header-nav" id="headerNav"></nav>
   <div class="header-search"><i class="ti ti-search"></i><input type="text" id="globalSearch" placeholder="Search signs..." oninput="doFilter()"/></div>
+  <button class="mobile-search-btn" id="mobileSearchBtn" onclick="toggleMobileSearch()" aria-label="Search"><i class="ti ti-search"></i></button>
   <div class="lang-toggle">
     <button class="lang-btn active" onclick="setLang('en')">EN</button>
     <button class="lang-btn" onclick="setLang('es')">ES</button>
@@ -385,6 +509,11 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     <button class="hdr-btn" id="logoutBtn" style="display:none;" onclick="doLogout()"><i class="ti ti-logout"></i> Sign out</button>
   </div>
 </header>
+<div class="mobile-search-bar" id="mobileSearchBar">
+  <i class="ti ti-search"></i>
+  <input type="text" id="mobileGlobalSearch" placeholder="Search signs..." oninput="syncMobileSearch(this.value)"/>
+</div>
+<div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="closeMobileMenu()"></div>
 
 <div class="page" id="pageTopics">
   <div class="topics-wrap">
@@ -452,6 +581,9 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
       <div class="word-list" id="wordList"></div>
     </aside>
     <div class="right-wrap">
+      <div class="mobile-back-bar" id="mobileBackBar">
+        <button class="mobile-back-btn" onclick="backToWordList()"><i class="ti ti-arrow-left"></i> Back to list</button>
+      </div>
       <div class="dict-context-bar" id="dictContextBar" style="display:none;">
         <button class="dict-context-back" id="dictContextBackBtn" onclick="dictContextBack()"><i class="ti ti-arrow-left"></i> <span id="dictContextBackLabel">Back</span></button>
         <h2 class="dict-context-title" id="dictContextTitle"></h2>
@@ -1205,8 +1337,40 @@ onAuthStateChanged(auth, async user=>{
 });
 
 /* ══ PAGE ROUTING ══ */
+/* ══ MOBILE HEADER: hamburger nav drawer + search toggle ══ */
+window.toggleMobileMenu=function(){
+  const nav=document.getElementById('headerNav');
+  const overlay=document.getElementById('mobileNavOverlay');
+  if(!nav) return;
+  const opening=!nav.classList.contains('mobile-open');
+  nav.classList.toggle('mobile-open',opening);
+  if(overlay) overlay.classList.toggle('show',opening);
+};
+window.closeMobileMenu=function(){
+  const nav=document.getElementById('headerNav');
+  const overlay=document.getElementById('mobileNavOverlay');
+  if(nav) nav.classList.remove('mobile-open');
+  if(overlay) overlay.classList.remove('show');
+};
+window.toggleMobileSearch=function(){
+  const bar=document.getElementById('mobileSearchBar');
+  if(!bar) return;
+  const opening=!bar.classList.contains('show');
+  bar.classList.toggle('show',opening);
+  if(opening) document.getElementById('mobileGlobalSearch').focus();
+};
+// The mobile search bar is a separate input from the desktop header
+// search (different element so it can be hidden/shown independently),
+// so keep both in sync and reuse the same doFilter() pipeline.
+window.syncMobileSearch=function(val){
+  const desktop=document.getElementById('globalSearch');
+  if(desktop) desktop.value=val;
+  doFilter();
+};
+
 window.showPage=function(p,extra){
   if(p==='admin'&&!isAdmin){ showPage('login'); return; }
+  closeMobileMenu();
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   if(p!=='catopt') activeCatOptFieldId=null;
@@ -1233,6 +1397,9 @@ window.showPage=function(p,extra){
     // bar hidden.
     if(extra!=='keep-context'){ DICT_CONTEXT=null; resetFilters(); }
     renderDictContextBar();
+    // On mobile, always land on the list view (not a leftover detail
+    // view from a previous visit) when arriving at the Dictionary page.
+    showMobileWordList();
   }
   else if(p==='admin'){
     document.getElementById('pageAdmin').classList.add('active'); switchAdminTab('signs');
@@ -1245,6 +1412,7 @@ window.showPage=function(p,extra){
   }
   else if(p==='about'){ document.getElementById('pageAbout').classList.add('active'); document.querySelectorAll('.nav-item[data-page="about"]').forEach(el=>el.classList.add('active')); }
 };
+
 
 window.setLang=function(lang){
   const wasEn = currentLang==='en';
@@ -1968,8 +2136,32 @@ window.selectWord=async function(id){
   activeWord=w.id; activeVideoType='how';
   doFilter();
   renderDetail(w); // render immediately with whatever's cached (fast UI)
+  showMobileDetail(); // on mobile, slide from list to detail view
   await loadFeedbackForSign(id); // then refresh feedback async
   if(activeWord===id) renderDetail(w); // re-render only if still viewing same sign
+};
+
+/* ── Mobile list↔detail view toggle ──
+   On screens ≤768px the dictionary's list and detail panes are stacked
+   and only one is shown at a time. .mobile-detail-active on .main-layout
+   switches which one is visible. On wider screens these classes have no
+   effect (both panes are already shown side by side by the CSS grid). */
+window.showMobileDetail=function(){
+  const layout=document.querySelector('#pageDict .main-layout');
+  if(layout) layout.classList.add('mobile-detail-active');
+  const bar=document.getElementById('mobileBackBar');
+  if(bar) bar.classList.add('show');
+};
+window.showMobileWordList=function(){
+  const layout=document.querySelector('#pageDict .main-layout');
+  if(layout) layout.classList.remove('mobile-detail-active');
+  const bar=document.getElementById('mobileBackBar');
+  if(bar) bar.classList.remove('show');
+};
+window.backToWordList=function(){
+  activeWord=null;
+  showMobileWordList();
+  doFilter();
 };
 
 function renderDetail(w){
