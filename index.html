@@ -381,17 +381,18 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   .lang-toggle{margin-left:0;}
   .lang-btn{padding:4px 8px;}
   .header-right{margin-left:6px;gap:6px;}
-  .header-user span,.hdr-btn span{display:none;}
-  .hdr-btn{padding:7px 9px;}
+  .hdr-btn{padding:7px 9px;font-size:11px;}
   .es-notice-pop{width:min(300px,84vw);right:-40px;}
 
-  /* ── Handshape strip: horizontal scroll instead of wrap ── */
+  /* ── Handshape strip: horizontal scroll instead of wrap ──
+     Label text is kept (not hidden) — it just drops to its own line
+     above the scrollable row so the full sentence is still readable. */
   .hs-strip{padding-bottom:12px;}
+  .hs-all{padding:10px 14px 0;flex-wrap:wrap;}
+  .hs-label{margin-left:0;flex-basis:100%;}
   .hs-grid{padding:0 14px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
   .hs-grid::-webkit-scrollbar{display:none;}
   .hs-cell{width:44px;height:44px;}
-  .hs-all{padding:10px 14px 0;}
-  .hs-label{display:none;}
 
   /* ── Dictionary page: stack list + detail, toggle visibility ── */
   .main-layout{
@@ -418,8 +419,11 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   .right{padding:14px;}
   .detail-card{padding:18px 16px;max-width:none;}
   .entry-en{font-size:19px;}
-  .vid-tab span{display:none;}
-  .vid-tab{padding:10px 6px;}
+  /* Keep the same "How to Sign / Concept / Example" tab labels as desktop —
+     just let them wrap onto two rows and shrink padding/gap a bit so three
+     full-text tabs still fit on a narrow screen without truncating anything. */
+  .vid-tabs{flex-wrap:wrap;}
+  .vid-tab{padding:8px 6px;font-size:11px;flex-basis:31%;}
   .rv-vid-row{flex-direction:column;}
   .rv-vid-cell{min-width:0;}
 
@@ -428,14 +432,15 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   .adv-panel{padding:12px;}
   .options-wrap,.form-grid{grid-template-columns:1fr;}
 
-  /* ── Topics landing & category-options pages ── */
+  /* ── Topics landing & category-options pages ──
+     Single column (not 2) so each card has room to show its full
+     name + description, same content as desktop — nothing hidden. */
   .topics-wrap{padding:20px 14px 40px;}
   .topics-hero h1{font-size:21px;}
   .topics-hero-edit-btn{position:static;display:block;margin:0 auto 12px;}
-  .topics-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
-  .topic-card{padding:14px;}
-  .topic-card-name{font-size:13px;}
-  .topic-card-desc{display:none;}
+  .topics-grid{grid-template-columns:1fr;gap:10px;}
+  .topic-card{padding:16px;}
+  .topic-card-name{font-size:15px;}
 
   /* ── Modals: full-bleed on small screens ── */
   .modal-box{width:94vw;padding:16px;}
@@ -487,6 +492,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 <header class="header" id="mainHeader" style="display:none;">
   <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()" aria-label="Menu"><i class="ti ti-menu-2"></i></button>
   <div class="header-logo"><i class="ti ti-hand-finger"></i><div><div class="header-logo-text">SignBiz</div><div class="header-logo-sub">Business Sign Language</div></div></div>
+  <div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="closeMobileMenu()"></div>
   <nav class="header-nav" id="headerNav"></nav>
   <div class="header-search"><i class="ti ti-search"></i><input type="text" id="globalSearch" placeholder="Search signs..." oninput="doFilter()"/></div>
   <button class="mobile-search-btn" id="mobileSearchBtn" onclick="toggleMobileSearch()" aria-label="Search"><i class="ti ti-search"></i></button>
@@ -513,7 +519,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   <i class="ti ti-search"></i>
   <input type="text" id="mobileGlobalSearch" placeholder="Search signs..." oninput="syncMobileSearch(this.value)"/>
 </div>
-<div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="closeMobileMenu()"></div>
+
 
 <div class="page" id="pageTopics">
   <div class="topics-wrap">
