@@ -56,7 +56,18 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .nav-item.nav-drag-over{background:rgba(255,255,255,0.18);}
 .nav-item-remove{display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;color:rgba(255,255,255,0.6);}
 .nav-item-remove:hover{background:rgba(255,255,255,0.25);color:white;}
-.header-search{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.15);border-radius:var(--r-md);padding:0 12px;margin:10px 0 10px 16px;}
+.header-search{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.15);border-radius:var(--r-md);padding:0 12px;margin:10px 0 10px 16px;position:relative;}
+.search-autocomplete{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--r-md);box-shadow:0 8px 24px rgba(0,0,0,0.14);max-height:280px;overflow-y:auto;z-index:200;display:none;}
+.search-autocomplete.show{display:block;}
+.search-ac-item{padding:9px 14px;font-size:13px;cursor:pointer;color:var(--text);border-bottom:0.5px solid var(--border);}
+.search-ac-item:last-child{border-bottom:none;}
+.search-ac-item:hover,.search-ac-item.focused{background:var(--accent-light);color:var(--accent);}
+.search-ac-item em{font-style:normal;font-weight:600;}
+.search-ac-empty{padding:10px 14px;font-size:12px;color:var(--text3);}
+/* Researcher-only field badge */
+.researcher-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:1px 6px;border-radius:10px;background:#f3e8ff;color:#7c3aed;border:0.5px solid #c4b5fd;margin-left:5px;}
+.researcher-only-section{background:#faf5ff;border:0.5px solid #c4b5fd;border-radius:var(--r-md);padding:14px;margin-top:14px;}
+.researcher-only-section-title{font-size:11px;font-weight:600;color:#7c3aed;display:flex;align-items:center;gap:5px;margin-bottom:8px;}
 .header-search i{color:rgba(255,255,255,0.7);font-size:15px;}
 .header-search input{border:none;outline:none;background:transparent;font-size:13px;color:white;padding:7px 0;width:180px;}
 .header-search input::placeholder{color:rgba(255,255,255,0.5);}
@@ -472,9 +483,9 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 <div class="page" id="pageLogin">
   <div class="login-wrap">
     <div class="login-card">
-      <div class="login-logo"><i class="ti ti-hand-finger"></i><div><div class="login-logo-text">SignBiz Admin</div><div class="login-logo-sub">Business Sign Language</div></div></div>
-      <p style="font-size:14px;font-weight:500;margin-bottom:4px;">Sign in to manage the dictionary</p>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:18px;">Students don't need to sign in.</p>
+      <div class="login-logo"><i class="ti ti-hand-finger"></i><div><div class="login-logo-text">SignBiz</div><div class="login-logo-sub">Business Sign Language</div></div></div>
+      <p style="font-size:14px;font-weight:500;margin-bottom:4px;">Sign in</p>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:18px;">Researchers and admins — sign in to access extra features.</p>
       <div class="form-field"><label>Email</label><input type="email" id="loginEmail" onkeydown="if(event.key==='Enter')loginEmail_pw()"/></div>
       <div class="form-field"><label>Password</label><input type="password" id="loginPassword" onkeydown="if(event.key==='Enter')loginEmail_pw()"/></div>
       <div class="login-error" id="loginError"></div>
@@ -494,7 +505,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   <div class="header-logo"><i class="ti ti-hand-finger"></i><div><div class="header-logo-text">SignBiz</div><div class="header-logo-sub">Business Sign Language</div></div></div>
   <div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="closeMobileMenu()"></div>
   <nav class="header-nav" id="headerNav"></nav>
-  <div class="header-search"><i class="ti ti-search"></i><input type="text" id="globalSearch" placeholder="Search signs..." oninput="doFilter()"/></div>
+  <div class="header-search"><i class="ti ti-search"></i><input type="text" id="globalSearch" placeholder="Search signs..." oninput="onSearchInput(this.value)" onkeydown="onSearchKeydown(event)" autocomplete="off"/><div class="search-autocomplete" id="searchAutocomplete"></div></div>
   <button class="mobile-search-btn" id="mobileSearchBtn" onclick="toggleMobileSearch()" aria-label="Search"><i class="ti ti-search"></i></button>
   <div class="lang-toggle">
     <button class="lang-btn active" onclick="setLang('en')">EN</button>
@@ -511,7 +522,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     <div class="header-user" id="headerUser" style="display:none;"></div>
     <button class="hdr-btn" id="navManageBtn" style="display:none;" onclick="toggleNavManageMode()"><i class="ti ti-arrows-move"></i> Manage nav</button>
     <button class="hdr-btn" id="adminNavBtn" style="display:none;" onclick="showPage('admin')"><i class="ti ti-settings"></i> Manage</button>
-    <button class="hdr-btn" id="loginNavBtn" onclick="showPage('login')"><i class="ti ti-login"></i> Admin Login</button>
+    <button class="hdr-btn" id="loginNavBtn" onclick="showPage('login')"><i class="ti ti-login"></i> Login</button>
     <button class="hdr-btn" id="logoutBtn" style="display:none;" onclick="doLogout()"><i class="ti ti-logout"></i> Sign out</button>
   </div>
 </header>
@@ -632,9 +643,10 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
       <div class="cf-new-row">
         <div class="form-field"><label>New category name</label><input type="text" id="newFieldName" placeholder="e.g. Region, Industry..."/></div>
         <div class="form-field" style="max-width:180px;"><label>Type</label>
-          <select id="newFieldType"><option value="multiselect">Multi-select</option><option value="singleselect">Single-select</option></select>
+          <select id="newFieldType"><option value="multiselect">Multi-select</option><option value="singleselect">Single-select</option><option value="paragraph">Paragraph (text)</option></select>
         </div>
-        <div class="form-field" style="flex:2;"><label>Starting options (comma-separated)</label><input type="text" id="newFieldOptions" placeholder="e.g. North, South, East, West"/></div>
+        <div class="form-field" style="flex:2;"><label>Starting options (comma-separated)</label><input type="text" id="newFieldOptions" placeholder="e.g. North, South, East, West (not needed for Paragraph)"/></div>
+        <div class="form-field" style="max-width:160px;padding-top:20px;"><label class="cf-landing-toggle" style="font-size:12px;"><input type="checkbox" id="newFieldResearcher"/> Researcher only</label></div>
         <div style="padding-bottom:0;"><button class="btn btn-primary" onclick="addNewCategoryBlock()" style="margin-top:20px;"><i class="ti ti-plus"></i> New category</button></div>
       </div>
       <p class="options-note" style="margin-top:-8px;margin-bottom:14px;">Tip: add starting options now so the category isn't empty in the sign editor.</p>
@@ -795,6 +807,7 @@ let fbRating=0, fbType='';
 let feedbackBySign={}; // signId → array of feedback docs (cached after first load per sign)
 let isAdmin=false; // determined by checking admins/{email} collection after login
 let isMainAdmin=false; // true only if admins/{email}.role === 'main'
+let isResearcher=false; // true if admins/{email}.role === 'researcher' (read-only, no admin panel)
 let adminName=''; // display name from admins/{email}.name, falls back to email
 
 // Escapes any string before it goes into an innerHTML template literal. Every value that
@@ -1317,15 +1330,20 @@ async function checkAdminDoc(user){
 onAuthStateChanged(auth, async user=>{
   currentUser=user;
   const adminData = user ? await checkAdminDoc(user) : null;
-  isAdmin = !!adminData;
+  isAdmin = !!adminData && adminData.role !== 'researcher';
   isMainAdmin = !!adminData && adminData.role==='main';
+  isResearcher = !!adminData && adminData.role==='researcher';
   adminName = adminData?.name || user?.displayName || user?.email || '';
   await loadUserPrefs();
   const uEl=document.getElementById('headerUser'), aBtn=document.getElementById('adminNavBtn'),
         lBtn=document.getElementById('loginNavBtn'), oBtn=document.getElementById('logoutBtn');
   if(user){
+    const roleBadge = isMainAdmin ? `<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:rgba(255,255,255,0.25);color:white;font-weight:600;">Main Admin</span>`
+      : isAdmin ? `<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:rgba(255,255,255,0.2);color:white;font-weight:600;">Staff</span>`
+      : isResearcher ? `<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:rgba(255,255,255,0.15);color:white;font-weight:600;">Researcher</span>`
+      : '';
     uEl.style.display='flex';
-    uEl.innerHTML=user.photoURL?`<img src="${esc(user.photoURL)}"/><span>${esc(user.displayName||user.email)}</span>`:`<i class="ti ti-user-circle"></i><span>${esc(user.email)}</span>`;
+    uEl.innerHTML=(user.photoURL?`<img src="${esc(user.photoURL)}"/>`:`<i class="ti ti-user-circle"></i>`)+`<span>${esc(user.displayName||user.email)}</span>${roleBadge}`;
     aBtn.style.display=isAdmin?'flex':'none';
     lBtn.style.display='none'; oBtn.style.display='flex';
     if(document.getElementById('pageLogin').classList.contains('active')) showPage('dict');
@@ -1372,6 +1390,7 @@ window.syncMobileSearch=function(val){
   const desktop=document.getElementById('globalSearch');
   if(desktop) desktop.value=val;
   doFilter();
+  renderAcDropdown(val.trim());
 };
 
 window.showPage=function(p,extra){
@@ -1380,6 +1399,14 @@ window.showPage=function(p,extra){
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   if(p!=='catopt') activeCatOptFieldId=null;
+  // Search bar only appears on the Dictionary page
+  const searchWrap=document.querySelector('.header-search');
+  const mobileSearchBtn=document.getElementById('mobileSearchBtn');
+  const mobileSearchBar=document.getElementById('mobileSearchBar');
+  const showSearch=(p==='dict');
+  if(searchWrap) searchWrap.style.display=showSearch?'flex':'none';
+  if(mobileSearchBtn) mobileSearchBtn.style.display=showSearch?'flex':'none';
+  if(!showSearch && mobileSearchBar) mobileSearchBar.classList.remove('show');
   if(p==='login'){ document.getElementById('pageLogin').classList.add('active'); }
   else if(p==='topics'){ document.getElementById('pageTopics').classList.add('active'); document.querySelectorAll('.nav-item[data-page="topics"]').forEach(el=>el.classList.add('active')); (dataLoadedPromise||Promise.resolve()).then(renderTopicsLanding); }
   else if(p==='catopt'){
@@ -1500,11 +1527,14 @@ function builtinCategoryDefs(){
   ];
 }
 function customCategoryDefs(){
-  return CUSTOM_FIELDS.map(cf=>({
-    key:'cf_'+cf.id, name:cf.name,
-    arr:CUSTOM_OPTIONS.filter(o=>o.fieldId===cf.id),
-    field:'cf_'+cf.id, type:cf.type
-  }));
+  return CUSTOM_FIELDS
+    .filter(cf=> isAdmin || isResearcher || !cf.researcherOnly)
+    .map(cf=>({
+      key:'cf_'+cf.id, name:cf.name,
+      arr:CUSTOM_OPTIONS.filter(o=>o.fieldId===cf.id),
+      field:'cf_'+cf.id, type:cf.type,
+      researcherOnly:cf.researcherOnly||false
+    }));
 }
 function allCategoryDefs(){ return [...builtinCategoryDefs(), ...customCategoryDefs()]; }
 
@@ -1518,6 +1548,9 @@ function buildFilterPanel(){
     return d;
   }
   allCategoryDefs().forEach(def=>{
+    // Skip paragraph fields (free text, not filterable) and researcher-only from filter panel for non-researchers/admins
+    if(def.type==='paragraph') return;
+    if(def.researcherOnly && !isAdmin && !isResearcher) return;
     wrap.appendChild(makeSelect('f_'+def.key, def.name, def.arr.map(x=>x.value)));
   });
   const hands=[...new Set(WORDS.flatMap(w=>Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[])))].sort();
@@ -2088,6 +2121,61 @@ window.removeNavItem=async function(fieldId){
 };
 
 
+/* ══ SEARCH AUTOCOMPLETE ══ */
+let acFocusIndex=-1;
+function buildAcItems(q){
+  if(!q || q.length<1) return [];
+  const ql=q.toLowerCase();
+  return WORDS.filter(w=>w.en.toLowerCase().includes(ql)||(w.es||'').toLowerCase().includes(ql))
+    .slice(0,10)
+    .map(w=>({id:w.id,label:w.en,sub:w.es||''}));
+}
+function highlightMatch(text,q){
+  if(!q) return esc(text);
+  const idx=text.toLowerCase().indexOf(q.toLowerCase());
+  if(idx===-1) return esc(text);
+  return esc(text.slice(0,idx))+'<em>'+esc(text.slice(idx,idx+q.length))+'</em>'+esc(text.slice(idx+q.length));
+}
+function renderAcDropdown(q){
+  const dd=document.getElementById('searchAutocomplete'); if(!dd) return;
+  const items=buildAcItems(q);
+  if(!items.length||!q){ dd.classList.remove('show'); dd.innerHTML=''; acFocusIndex=-1; return; }
+  dd.innerHTML=items.map((it,i)=>`<div class="search-ac-item" data-id="${it.id}" onmousedown="acSelect('${it.id}')" onmouseover="acHover(${i})">${highlightMatch(it.label,q)}${it.sub?`<span style="font-size:11px;color:var(--text3);margin-left:6px;">${esc(it.sub)}</span>`:''}</div>`).join('');
+  dd.classList.add('show'); acFocusIndex=-1;
+}
+window.acSelect=function(id){
+  closeAcDropdown();
+  document.getElementById('globalSearch').value='';
+  // Navigate to dictionary and open this word
+  if(!document.getElementById('pageDict').classList.contains('active')){
+    DICT_CONTEXT=null;
+    document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+    document.getElementById('pageDict').classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+    document.querySelectorAll('.nav-item[data-page="dict"]').forEach(el=>el.classList.add('active'));
+    const searchWrap=document.querySelector('.header-search');
+    if(searchWrap) searchWrap.style.display='flex';
+    resetFilters();
+    renderDictContextBar();
+  }
+  selectWord(id);
+};
+window.acHover=function(i){ acFocusIndex=i; document.querySelectorAll('#searchAutocomplete .search-ac-item').forEach((el,j)=>el.classList.toggle('focused',j===i)); };
+function closeAcDropdown(){ const dd=document.getElementById('searchAutocomplete'); if(dd){dd.classList.remove('show'); dd.innerHTML='';} acFocusIndex=-1; }
+window.onSearchInput=function(val){
+  doFilter();
+  renderAcDropdown(val.trim());
+};
+window.onSearchKeydown=function(e){
+  const dd=document.getElementById('searchAutocomplete');
+  const items=dd?dd.querySelectorAll('.search-ac-item'):[];
+  if(e.key==='ArrowDown'){ e.preventDefault(); acFocusIndex=Math.min(acFocusIndex+1,items.length-1); items.forEach((el,i)=>el.classList.toggle('focused',i===acFocusIndex)); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); acFocusIndex=Math.max(acFocusIndex-1,0); items.forEach((el,i)=>el.classList.toggle('focused',i===acFocusIndex)); }
+  else if(e.key==='Enter'){ if(acFocusIndex>=0 && items[acFocusIndex]){ acSelect(items[acFocusIndex].dataset.id); } }
+  else if(e.key==='Escape'){ closeAcDropdown(); }
+};
+document.addEventListener('click',e=>{ if(!e.target.closest('.header-search')) closeAcDropdown(); });
+
 window.doFilter=function(){
   const q=(document.getElementById('globalSearch').value||'').trim().toLowerCase();
   const fHand=document.getElementById('fHand')?.value||'';
@@ -2173,8 +2261,9 @@ window.backToWordList=function(){
 function renderDetail(w){
   const dc=DIFF_C[w.diff]||CAT_C._default;
   const defs=allCategoryDefs();
-  const pillsHtml=defs.map(def=>{
+  const pillsHtml=defs.filter(def=>!def.researcherOnly).map(def=>{
     const wVal=w[def.field];
+    if(def.type==='paragraph') return ''; // paragraphs shown below, not as pills
     const vals=def.type==='singleselect'?(wVal?[wVal]:[]):(Array.isArray(wVal)?wVal:(wVal?[wVal]:[]));
     if(!vals.length) return '';
     if(def.key==='diff') return vals.map(v=>`<span class="pill" style="background:${dc[0]};color:${dc[1]}">${esc(v)}</span>`).join('');
@@ -2183,6 +2272,21 @@ function renderDetail(w){
   const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
   const handPills=hands.map(h=>`<span class="pill" style="background:var(--accent-light);color:var(--accent)">Handshape ${esc(h)}</span>`).join('');
   const specialPills=(w.special||[]).map(s=>`<span class="pill" style="background:var(--bg2);color:var(--text2);border:0.5px solid var(--border)">${esc(s)}</span>`).join('');
+
+  // Researcher-only fields section (only visible to researchers and admins)
+  const researcherDefs=CUSTOM_FIELDS.filter(cf=>cf.researcherOnly && (isAdmin||isResearcher));
+  const researcherHtml=researcherDefs.length ? `
+    <div class="researcher-only-section">
+      <div class="researcher-only-section-title"><i class="ti ti-microscope"></i> Researcher metadata</div>
+      ${researcherDefs.map(cf=>{
+        const val=w['cf_'+cf.id];
+        if(!val && !isAdmin) return '';
+        const display=cf.type==='paragraph'
+          ? `<p style="font-size:13px;color:var(--text2);line-height:1.65;white-space:pre-wrap;">${esc(val||'—')}</p>`
+          : (Array.isArray(val)?val:(val?[val]:[])).map(v=>`<span class="pill" style="background:#ede9fe;color:#7c3aed;">${esc(v)}</span>`).join('')||'<span style="font-size:12px;color:var(--text3);">—</span>';
+        return `<div style="margin-bottom:8px;"><p style="font-size:11px;color:#7c3aed;font-weight:600;margin-bottom:4px;">${esc(cf.name)}</p>${display}</div>`;
+      }).join('')}
+    </div>` : '';
 
   const tabs=['how','concept','example'].map(type=>{
     const m=VID_META[type]; const isActive=type===activeVideoType;
@@ -2203,6 +2307,7 @@ function renderDetail(w){
       <div class="vid-tabs">${tabs}</div>
       <div class="video-box">${videoHtml}</div>
       <p class="entry-desc"><strong>How to sign:</strong> ${esc(w.desc||'')}</p>
+      ${researcherHtml}
       <div class="feedback-wrap" id="feedbackWrap_${w.id}">
         ${renderFeedbackSection(w)}
       </div>
@@ -2494,10 +2599,29 @@ function buildModalFields(w){
   // Dynamic category blocks (built-in cat/topic/diff + all custom fields), in one wrap
   const wrap=document.getElementById('fDynamicCategories'); wrap.innerHTML='';
   allCategoryDefs().forEach(def=>{
+    // Researcher-only fields: only show to main admin or staff (both isAdmin), and researchers
+    if(def.researcherOnly && !isAdmin && !isResearcher) return;
     const fd=document.createElement('div'); fd.className='form-field';
     const lbl=document.createElement('label');
     const isBuiltin=['cat','topic','diff'].includes(def.key);
-    lbl.innerHTML=`${esc(def.name)}${def.key==='cat'?' *':''} <button type="button" class="inline-add-btn" style="height:auto;padding:1px 8px;font-size:14px;" onclick="${isBuiltin?`inlineAddBuiltin('${def.key}')`:`inlineAddCustom('${def.key.replace('cf_','')}')`}">+</button>`;
+    const rBadge=def.researcherOnly?`<span class="researcher-badge"><i class="ti ti-microscope" style="font-size:10px;"></i> Researcher only</span>`:'';
+    lbl.innerHTML=`${esc(def.name)}${def.key==='cat'?' *':''} ${rBadge} `;
+    // Paragraph type: show a textarea, not chips
+    if(def.type==='paragraph'){
+      fd.appendChild(lbl);
+      const ta=document.createElement('textarea');
+      ta.className='fb-textarea'; ta.style.minHeight='80px';
+      // Researcher-only paragraph fields: disable for non-researchers/admins (but here we already filtered above)
+      // If researcher-only and the current user is researcher, enable; admin always can edit
+      if(def.researcherOnly && !isAdmin && !isResearcher) ta.disabled=true;
+      ta.value=w[def.field]||'';
+      ta.oninput=()=>{ editFormValues[def.field]=ta.value; };
+      fd.appendChild(ta);
+      editFormValues[def.field]=ta.value;
+      wrap.appendChild(fd);
+      return;
+    }
+    lbl.innerHTML+=`<button type="button" class="inline-add-btn" style="height:auto;padding:1px 8px;font-size:14px;" onclick="${isBuiltin?`inlineAddBuiltin('${def.key}')`:`inlineAddCustom('${def.key.replace('cf_','')}')`}">+</button>`;
     fd.appendChild(lbl);
     const ms=document.createElement('div'); ms.className='ms-wrap'; ms.id='chips_'+def.key;
     fd.appendChild(ms);
@@ -2505,9 +2629,6 @@ function buildModalFields(w){
 
     const values=def.arr.map(x=>x.value);
     const isSingle=def.type==='singleselect';
-    // Prefer the in-progress selection (editFormValues) if it already exists for this
-    // field — this preserves what the user picked even after we re-render the form
-    // (e.g. right after adding a new option via the + button).
     let cur;
     if(Object.prototype.hasOwnProperty.call(editFormValues, def.field)){
       cur = isSingle ? editFormValues[def.field] : [...(editFormValues[def.field]||[])];
@@ -2638,7 +2759,9 @@ function appendBuiltinCard(wrap,title,colName,items,type,key,subtitle,wide=false
 function appendCustomCard(wrap,cf,items){
   const card=makeCustomCard(cf);
   wrap.appendChild(card);
-  renderValueRows('cst_'+cf.id,items,false,(id,val)=>renameCustomValue(cf.id,id,val),(id)=>deleteCustomValue(cf.id,id),'customFieldOptions');
+  if(cf.type!=='paragraph'){
+    renderValueRows('cst_'+cf.id,items,false,(id,val)=>renameCustomValue(cf.id,id,val),(id)=>deleteCustomValue(cf.id,id),'customFieldOptions');
+  }
 }
 
 function makeBuiltinCard(title,colName,type,key,subtitle,wide=false){
@@ -2657,17 +2780,20 @@ function makeBuiltinCard(title,colName,type,key,subtitle,wide=false){
 function makeCustomCard(cf){
   const card=document.createElement('div'); card.className='options-card';
   const listId='cst_'+cf.id;
+  const typeLabel=cf.type==='paragraph'?'(paragraph text) · custom':cf.type==='singleselect'?'(single-select) · custom':'(multi-select) · custom';
+  const rBadge=cf.researcherOnly?`<span class="researcher-badge"><i class="ti ti-microscope" style="font-size:10px;"></i> Researcher only</span>`:'';
+  const optionsSection=cf.type==='paragraph'?`<p style="font-size:12px;color:var(--text3);padding:4px 2px;font-style:italic;">Paragraph fields don't have preset options — admins enter text per sign.</p>`:`<div class="options-list" id="${listId}"></div><div class="options-add-row"><input type="text" id="newc_${cf.id}" placeholder="New value..." onkeydown="if(event.key==='Enter')addCustomValue('${cf.id}')"/><button onclick="addCustomValue('${cf.id}')">Add</button></div>`;
   card.innerHTML=`
     <div class="options-card-title" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>${esc(cf.name)} <span style="font-size:10px;color:var(--text3);font-weight:400;">${cf.type==='singleselect'?'(single-select)':'(multi-select)'} · custom</span></span>
+      <span>${esc(cf.name)} <span style="font-size:10px;color:var(--text3);font-weight:400;">${typeLabel}</span>${rBadge}</span>
       <button class="row-btn del" onclick="deleteCustomCategory('${cf.id}')" title="Delete this category"><i class="ti ti-trash"></i></button>
     </div>
     <div class="options-card-sub">Custom category — appears in sign editor and filters.</div>
+    <label class="cf-landing-toggle"><input type="checkbox" id="cfResearcher_${cf.id}" ${cf.researcherOnly?'checked':''} onchange="toggleResearcherOnly('${cf.id}',this.checked)"/> Researcher only (hidden from students and guests)</label>
     <label class="cf-landing-toggle"><input type="checkbox" id="cfLanding_${cf.id}" ${cf.showOnLanding?'checked':''} onchange="toggleCategoryOnLanding('customFields','${cf.id}',this.checked)"/> Show as a card on the Topics landing page</label>
     <label class="cf-landing-toggle"><input type="checkbox" id="cfNav_${cf.id}" ${cf.showInNav?'checked':''} onchange="toggleCategoryInNav('${cf.id}',this.checked)"/> Show as a top navigation item</label>
     <textarea class="topic-card-desc-input" id="cfDesc_${cf.id}" placeholder="Optional description shown on the card..." onblur="saveCategoryCardDesc('customFields','${cf.id}',this.value)">${esc(cf.description||'')}</textarea>
-    <div class="options-list" id="${listId}"></div>
-    <div class="options-add-row"><input type="text" id="newc_${cf.id}" placeholder="New value..." onkeydown="if(event.key==='Enter')addCustomValue('${cf.id}')"/><button onclick="addCustomValue('${cf.id}')">Add</button></div>
+    ${optionsSection}
   `;
   return card;
 }
@@ -2743,6 +2869,15 @@ function rerenderActiveLandingSurface(){
   if(document.getElementById('pageTopics')?.classList.contains('active')) renderTopicsLanding();
   if(document.getElementById('pageCategoryOptions')?.classList.contains('active') && activeCatOptFieldId) renderCategoryOptionsPage(activeCatOptFieldId);
 }
+window.toggleResearcherOnly=async function(fieldId,on){
+  const cf=CUSTOM_FIELDS.find(f=>f.id===fieldId); if(!cf) return;
+  cf.researcherOnly=on;
+  try{ await setDoc(doc(db,'customFields',fieldId),{researcherOnly:on},{merge:true}); }
+  catch(err){ console.error(err); showToast('⚠ Could not save. Try again.'); cf.researcherOnly=!on; return; }
+  buildFilterPanel();
+  showToast(on?'Field set to Researcher only':'Field visible to all roles');
+};
+
 window.toggleCategoryOnLanding=async function(colName,id,showOn){
   const arr = arrFor(colName);
   const item = arr.find(x=>x.id===id); if(!item) return;
@@ -2840,15 +2975,17 @@ window.addNewCategoryBlock=async function(){
   const name=document.getElementById('newFieldName').value.trim();
   const type=document.getElementById('newFieldType').value;
   const optsRaw=document.getElementById('newFieldOptions').value.trim();
+  const researcherOnly=document.getElementById('newFieldResearcher')?.checked||false;
   if(!name){ showToast('Please enter a category name.'); return; }
   if(CUSTOM_FIELDS.some(f=>f.name.toLowerCase()===name.toLowerCase())){ showToast('A category with that name already exists.'); return; }
   showSaving(true);
   let fieldRef;
-  try{ fieldRef=await addDoc(collection(db,'customFields'),{name,type}); }
+  try{ fieldRef=await addDoc(collection(db,'customFields'),{name,type,researcherOnly}); }
   catch(err){ console.error(err); showToast('⚠ Could not create category.'); showSaving(false); return; }
-  const newField={id:fieldRef.id,name,type};
+  const newField={id:fieldRef.id,name,type,researcherOnly};
   CUSTOM_FIELDS.push(newField);
-  const opts=optsRaw?optsRaw.split(',').map(s=>s.trim()).filter(Boolean):[];
+  // Paragraph fields don't have options
+  const opts=(type==='paragraph'||!optsRaw)?[]:optsRaw.split(',').map(s=>s.trim()).filter(Boolean);
   for(const v of opts){
     try{
       const optRef=await addDoc(collection(db,'customFieldOptions'),{fieldId:newField.id,value:v});
@@ -2858,6 +2995,7 @@ window.addNewCategoryBlock=async function(){
   showSaving(false);
   document.getElementById('newFieldName').value='';
   document.getElementById('newFieldOptions').value='';
+  if(document.getElementById('newFieldResearcher')) document.getElementById('newFieldResearcher').checked=false;
   buildFilterPanel(); renderOptionsPanel();
   showToast(`Category "${name}" created${opts.length?` with ${opts.length} option(s)`:''}`);
 };
@@ -3130,6 +3268,11 @@ async function init(){
   renderHeaderNav();
   document.getElementById('appLoading').style.display='none';
   document.getElementById('mainHeader').style.display='flex';
+  // Hide search bar initially (only shown on Dictionary page)
+  const sw=document.querySelector('.header-search');
+  if(sw) sw.style.display='none';
+  const msb=document.getElementById('mobileSearchBtn');
+  if(msb) msb.style.display='none';
   buildFilterPanel(); buildFilterTags(); buildHsGrid(); doFilter();
   showPage('topics');
 }
