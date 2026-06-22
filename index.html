@@ -120,7 +120,12 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .ms-wrap{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
 .ms-chip{font-size:11px;padding:4px 10px;border-radius:20px;border:0.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;user-select:none;}
 .ms-chip.on{background:var(--accent);color:white;border-color:var(--accent);}
-.right{padding:24px;overflow-y:auto;background:var(--bg3);}
+.right-wrap{display:flex;flex-direction:column;overflow:hidden;background:var(--bg3);}
+.dict-context-bar{display:flex;align-items:baseline;gap:18px;padding:18px 24px 4px;background:var(--bg3);flex-shrink:0;}
+.dict-context-back{display:flex;align-items:center;gap:5px;font-size:14px;color:var(--text2);background:none;border:none;cursor:pointer;padding:4px 0;white-space:nowrap;}
+.dict-context-back:hover{color:var(--accent);}
+.dict-context-title{font-size:28px;font-weight:600;color:var(--text);margin:0;}
+.right{padding:24px;overflow-y:auto;background:var(--bg3);flex:1;}
 .detail-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:22px 24px;max-width:660px;}
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:360px;color:var(--text3);gap:10px;}
 .empty-state i{font-size:36px;}
@@ -446,9 +451,15 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
       <p class="result-count" id="resultCount"></p>
       <div class="word-list" id="wordList"></div>
     </aside>
-    <main class="right" id="rightPanel">
-      <div class="empty-state"><i class="ti ti-hand-finger"></i><p>Select a sign from the list<br>to view its videos and description.</p></div>
-    </main>
+    <div class="right-wrap">
+      <div class="dict-context-bar" id="dictContextBar" style="display:none;">
+        <button class="dict-context-back" id="dictContextBackBtn" onclick="dictContextBack()"><i class="ti ti-arrow-left"></i> <span id="dictContextBackLabel">Back</span></button>
+        <h2 class="dict-context-title" id="dictContextTitle"></h2>
+      </div>
+      <main class="right" id="rightPanel">
+        <div class="empty-state"><i class="ti ti-hand-finger"></i><p>Select a sign from the list<br>to view its videos and description.</p></div>
+      </main>
+    </div>
   </div>
 </div>
 
@@ -1208,7 +1219,17 @@ window.showPage=function(p,extra){
     if(extra) document.querySelectorAll(`.nav-item[data-page="catopt"][data-field-id="${extra}"]`).forEach(el=>el.classList.add('active'));
     if(extra) (dataLoadedPromise||Promise.resolve()).then(()=>renderCategoryOptionsPage(extra));
   }
-  else if(p==='dict'){ document.getElementById('pageDict').classList.add('active'); document.querySelectorAll('.nav-item[data-page="dict"]').forEach(el=>el.classList.add('active')); }
+  else if(p==='dict'){
+    document.getElementById('pageDict').classList.add('active');
+    document.querySelectorAll('.nav-item[data-page="dict"]').forEach(el=>el.classList.add('active'));
+    // Entering the Dictionary with no context token (i.e. not via
+    // goToTopic/goToCategoryOption, which pass extra:'keep-context')
+    // means someone landed here directly — e.g. the nav bar's own
+    // "Dictionary" item — so it's the unfiltered "All signs" view with
+    // no Back button, matching the Topics-landing "All signs" card.
+    if(extra!=='keep-context') DICT_CONTEXT=null;
+    renderDictContextBar();
+  }
   else if(p==='admin'){
     document.getElementById('pageAdmin').classList.add('active'); switchAdminTab('signs');
     const tbody=document.getElementById('adminTbody');
@@ -1478,7 +1499,11 @@ window.removeTopicsCard=async function(colName,id){
 // pre-filtered. (Custom categories are a container with their own options
 // underneath, so they route through goToCategoryOptions instead — see below.)
 window.goToTopic=function(value){
-  showPage('dict');
+  // A specific topic (e.g. "Finance") gets a title + "Back to Topics".
+  // No value (the "All signs" card) is the plain unfiltered view — same
+  // as landing on the Dictionary any other way, so no context bar at all.
+  DICT_CONTEXT = value ? { title:value, backLabel:'Back to Topics', backAction:()=>showPage('topics') } : null;
+  showPage('dict','keep-context');
   resetFilters();
   if(value){
     const sel=document.getElementById('f_topic');
@@ -1624,13 +1649,35 @@ window.removeCatOptCard=async function(fieldId,optId){
 
 // Clicking an option card (e.g. BUS201) is the bottom of the hierarchy —
 // it jumps to the Dictionary filtered to signs carrying that option value
-// for this specific custom field.
+// for this specific custom field. The Back button returns to THIS
+// category's own options page (e.g. "Back to Book"), not the Topics
+// landing page — Book is where this option card lived, two layers down.
 window.goToCategoryOption=function(fieldId,value){
-  showPage('dict');
+  const cf=CUSTOM_FIELDS.find(f=>f.id===fieldId);
+  DICT_CONTEXT = { title:value, backLabel:'Back to '+(cf?cf.name:'category'), backAction:()=>showPage('catopt',fieldId) };
+  showPage('dict','keep-context');
   resetFilters();
   const sel=document.getElementById('f_cf_'+fieldId);
   if(sel) sel.value=value;
   doFilter();
+};
+
+// Paints the bar above the Dictionary's right-hand panel that shows
+// where the current filtered view came from — e.g. "Finance" with a
+// "Back to Topics" button, or "BUS202" with a "Back to Book" button.
+// When DICT_CONTEXT is null (plain "All signs", reached via the nav bar
+// or any other unfiltered entry point), the whole bar is hidden — no
+// title, no Back button, matching the look of a normal full-dictionary
+// view.
+function renderDictContextBar(){
+  const bar=document.getElementById('dictContextBar'); if(!bar) return;
+  if(!DICT_CONTEXT){ bar.style.display='none'; return; }
+  bar.style.display='flex';
+  document.getElementById('dictContextBackLabel').textContent=DICT_CONTEXT.backLabel;
+  document.getElementById('dictContextTitle').textContent=DICT_CONTEXT.title;
+}
+window.dictContextBack=function(){
+  if(DICT_CONTEXT && DICT_CONTEXT.backAction) DICT_CONTEXT.backAction();
 };
 
 /* ── Per-category hero text (stored on the customFields/{id} doc itself,
@@ -1726,6 +1773,7 @@ const NAV_FIXED_DEFS={
 let NAV_ORDER=[ {type:'fixed',key:'topics'}, {type:'fixed',key:'dict'}, {type:'fixed',key:'about'} ];
 let navManageMode=false;
 let activeCatOptFieldId=null; // which custom category's options page is currently shown, if any
+let DICT_CONTEXT=null; // {title, backLabel, backAction} when Dictionary was entered via a Topic/category-option card; null = plain "All signs" view, no Back button
 let navDragSrc=null;
 
 async function loadNavOrder(){
