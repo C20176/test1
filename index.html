@@ -1225,9 +1225,13 @@ window.showPage=function(p,extra){
     // Entering the Dictionary with no context token (i.e. not via
     // goToTopic/goToCategoryOption, which pass extra:'keep-context')
     // means someone landed here directly — e.g. the nav bar's own
-    // "Dictionary" item — so it's the unfiltered "All signs" view with
-    // no Back button, matching the Topics-landing "All signs" card.
-    if(extra!=='keep-context') DICT_CONTEXT=null;
+    // "Dictionary" item — so it's the unfiltered "All signs" view: no
+    // context bar, AND no leftover filter from whatever was clicked
+    // last time. Clearing DICT_CONTEXT alone isn't enough — the actual
+    // filter dropdowns (like f_topic) stay set until resetFilters()
+    // runs, otherwise the list still looks pre-filtered even with the
+    // bar hidden.
+    if(extra!=='keep-context'){ DICT_CONTEXT=null; resetFilters(); }
     renderDictContextBar();
   }
   else if(p==='admin'){
