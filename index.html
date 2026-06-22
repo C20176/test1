@@ -60,9 +60,19 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .header-search i{color:rgba(255,255,255,0.7);font-size:15px;}
 .header-search input{border:none;outline:none;background:transparent;font-size:13px;color:white;padding:7px 0;width:180px;}
 .header-search input::placeholder{color:rgba(255,255,255,0.5);}
-.lang-toggle{display:flex;align-items:center;gap:3px;background:rgba(255,255,255,0.12);border-radius:var(--r-md);padding:3px;margin-left:12px;}
+.lang-toggle{display:flex;align-items:center;gap:3px;background:rgba(255,255,255,0.12);border-radius:var(--r-md);padding:3px;margin-left:12px;position:relative;}
 .lang-btn{font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:transparent;color:rgba(255,255,255,0.65);}
 .lang-btn.active{background:white;color:var(--accent);}
+.lang-info-btn{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:none;background:transparent;color:rgba(255,255,255,0.55);cursor:pointer;margin-left:2px;}
+.lang-info-btn:hover{color:white;background:rgba(255,255,255,0.18);}
+.es-notice-pop{display:none;position:absolute;top:calc(100% + 10px);right:0;z-index:200;width:300px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);box-shadow:0 10px 30px rgba(0,0,0,0.18);padding:16px;}
+.es-notice-pop.show{display:block;}
+.es-notice-pop:before{content:'';position:absolute;top:-6px;right:18px;width:12px;height:12px;background:var(--bg);border-left:0.5px solid var(--border);border-top:0.5px solid var(--border);transform:rotate(45deg);}
+.es-notice-es{font-size:13px;color:var(--text);line-height:1.5;}
+.es-notice-divider{border:none;border-top:0.5px solid var(--border);margin:10px 0;}
+.es-notice-en{font-size:12px;color:var(--text2);line-height:1.5;}
+.es-notice-ack-btn{margin-top:12px;width:100%;font-size:12px;font-weight:600;padding:8px;border-radius:var(--r-md);border:none;background:var(--accent);color:white;cursor:pointer;}
+.es-notice-ack-btn:hover{opacity:0.9;}
 .header-right{display:flex;align-items:center;gap:8px;margin-left:16px;}
 .header-user{display:flex;align-items:center;gap:7px;font-size:12px;color:rgba(255,255,255,0.8);}
 .header-user img{width:26px;height:26px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.5);}
@@ -354,6 +364,13 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   <div class="lang-toggle">
     <button class="lang-btn active" onclick="setLang('en')">EN</button>
     <button class="lang-btn" onclick="setLang('es')">ES</button>
+    <button class="lang-info-btn" onclick="showEsNotice()" title="About Spanish translations"><i class="ti ti-info-circle" style="font-size:13px;"></i></button>
+    <div class="es-notice-pop" id="esNoticePop">
+      <p class="es-notice-es">Tenga en cuenta que la traducción al español solo funciona para los nombres de las palabras y el buscador. No está disponible en el resto de la página. Las traducciones pueden contener errores. Si encuentra algún problema, háganoslo saber mediante el formulario de comentarios (feedback).</p>
+      <hr class="es-notice-divider"/>
+      <p class="es-notice-en">Please note Spanish translation only works for word names and the search bar — it isn't available elsewhere on the site. Translations may also contain errors. If you spot a problem, please let us know using feedback.</p>
+      <button class="es-notice-ack-btn" onclick="ackEsNotice()">Entiendo / Got it</button>
+    </div>
   </div>
   <div class="header-right">
     <div class="header-user" id="headerUser" style="display:none;"></div>
@@ -1205,11 +1222,48 @@ window.showPage=function(p,extra){
 };
 
 window.setLang=function(lang){
+  const wasEn = currentLang==='en';
   currentLang=lang;
   document.querySelectorAll('.lang-btn').forEach((b,i)=>b.classList.toggle('active',(i===0&&lang==='en')||(i===1&&lang==='es')));
   doFilter();
   if(activeWord){ const w=WORDS.find(x=>x.id===activeWord); if(w) renderDetail(w); }
+  // Auto-show the Spanish-translation notice the first time someone
+  // switches INTO Spanish (en→es), unless they've already acknowledged
+  // it before on this browser. Switching to English never triggers it —
+  // English speakers are the default audience and don't need the notice.
+  // Re-switching es→es (clicking ES again while already on ES) also
+  // doesn't re-trigger it; only a fresh en→es transition does.
+  if(lang==='es' && wasEn && localStorage.getItem('signbiz_es_notice_ack')!=='1'){
+    showEsNotice();
+  } else if(lang==='en'){
+    hideEsNotice();
+  }
 };
+
+// Manual trigger (the info icon next to ES) always shows the notice,
+// regardless of whether it's been acknowledged before — someone might
+// want to re-read it on purpose.
+window.showEsNotice=function(){
+  document.getElementById('esNoticePop')?.classList.add('show');
+};
+window.hideEsNotice=function(){
+  document.getElementById('esNoticePop')?.classList.remove('show');
+};
+window.ackEsNotice=function(){
+  localStorage.setItem('signbiz_es_notice_ack','1');
+  hideEsNotice();
+};
+// Clicking anywhere outside the popover (and outside the language
+// toggle itself, whose own buttons already handle their own clicks)
+// closes it without acknowledging — so the notice will still auto-show
+// next time, same as if they'd never seen it. Only the explicit button
+// inside the popover counts as acknowledgement.
+document.addEventListener('click', e=>{
+  const pop=document.getElementById('esNoticePop');
+  if(!pop || !pop.classList.contains('show')) return;
+  if(e.target.closest('.lang-toggle')) return;
+  hideEsNotice();
+});
 
 /* ══ HANDSHAPE STRIP ══ */
 function buildHsGrid(){
@@ -2813,7 +2867,7 @@ window.deleteFeedback=async function(id,signId){
 let toastTimer;
 window.showToast=function(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2600); };
 
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeFsModal(); closeEditModal(); closeDeleteModal(); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeFsModal(); closeEditModal(); closeDeleteModal(); hideEsNotice(); } });
 
 /* ══ INIT ══ */
 async function init(){
