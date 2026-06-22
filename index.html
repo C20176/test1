@@ -50,6 +50,12 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .nav-item{padding:0 16px;display:flex;align-items:center;font-size:13px;color:rgba(255,255,255,0.75);cursor:pointer;border-bottom:3px solid transparent;}
 .nav-item:hover{color:white;background:rgba(255,255,255,0.08);}
 .nav-item.active{color:white;border-bottom-color:white;}
+.nav-item.nav-manage-mode{cursor:grab;gap:6px;}
+.nav-item.nav-manage-mode:hover{background:rgba(255,255,255,0.08);}
+.nav-item.nav-dragging{opacity:0.4;cursor:grabbing;}
+.nav-item.nav-drag-over{background:rgba(255,255,255,0.18);}
+.nav-item-remove{display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;color:rgba(255,255,255,0.6);}
+.nav-item-remove:hover{background:rgba(255,255,255,0.25);color:white;}
 .header-search{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.15);border-radius:var(--r-md);padding:0 12px;margin:10px 0 10px 16px;}
 .header-search i{color:rgba(255,255,255,0.7);font-size:15px;}
 .header-search input{border:none;outline:none;background:transparent;font-size:13px;color:white;padding:7px 0;width:180px;}
@@ -273,6 +279,43 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .yt-hint{font-size:11px;color:var(--text3);margin-top:4px;}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:white;font-size:13px;padding:10px 20px;border-radius:var(--r-lg);z-index:999;opacity:0;transition:opacity 0.2s;pointer-events:none;}
 .toast.show{opacity:1;}
+.topics-wrap{max-width:1080px;margin:0 auto;padding:40px 24px 60px;}
+.topics-hero{text-align:center;margin-bottom:36px;position:relative;}
+.topics-hero h1{font-size:26px;font-weight:500;color:var(--text);margin-bottom:8px;}
+.topics-hero p{font-size:14px;color:var(--text2);max-width:560px;margin:0 auto;line-height:1.6;white-space:pre-wrap;}
+.topics-hero-edit-btn{position:absolute;top:0;right:0;}
+.topics-hero-form{max-width:480px;margin:0 auto;text-align:left;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:18px 20px;}
+.topics-toolbar{display:flex;justify-content:flex-end;gap:8px;margin-bottom:18px;}
+.topics-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;}
+.topic-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:20px;cursor:pointer;display:flex;flex-direction:column;gap:6px;transition:transform 0.12s,box-shadow 0.12s,border-color 0.12s;position:relative;}
+.topic-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,0.08);border-color:var(--accent);}
+.topic-card-icon{width:38px;height:38px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:6px;}
+.topic-card-name{font-size:15px;font-weight:500;color:var(--text);}
+.topic-card-count{font-size:12px;color:var(--text3);}
+.topic-card-desc{font-size:12px;color:var(--text2);line-height:1.5;margin-top:2px;}
+.topic-card-empty{opacity:0.55;}
+.topic-card.all-signs{background:var(--accent);border-color:var(--accent);}
+.topic-card.all-signs .topic-card-icon{background:rgba(255,255,255,0.18);color:white;}
+.topic-card.all-signs .topic-card-name{color:white;}
+.topic-card.all-signs .topic-card-count{color:rgba(255,255,255,0.75);}
+.topics-empty-state{text-align:center;color:var(--text3);padding:60px 20px;}
+.topics-empty-state i{font-size:32px;display:block;margin-bottom:10px;}
+/* Manage mode (admin) */
+.topic-card.manage-mode{cursor:default;}
+.topic-card.manage-mode:hover{transform:none;box-shadow:none;}
+.topic-card[draggable="true"]{cursor:grab;}
+.topic-card.dragging{opacity:0.4;cursor:grabbing;}
+.topic-card.drag-over{box-shadow:0 0 0 2px var(--accent);transform:scale(1.02);}
+.topic-card-drag-handle{position:absolute;top:10px;right:10px;font-size:13px;color:var(--text3);cursor:grab;}
+.topic-card-mg-actions{display:flex;gap:6px;margin-top:8px;}
+.topic-card-mg-btn{font-size:10px;padding:3px 8px;border-radius:20px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;}
+.topic-card-mg-btn:hover{background:var(--bg2);}
+.topic-card-mg-btn.danger:hover{background:var(--danger-light);color:var(--danger);border-color:var(--danger);}
+.topic-card-pending{font-size:9px;padding:2px 7px;border-radius:20px;background:var(--vexample-light);color:var(--vexample);align-self:flex-start;}
+.topic-card-desc-input{width:100%;font-size:12px;padding:6px 8px;border-radius:var(--r-sm);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);outline:none;resize:vertical;min-height:48px;margin-top:6px;}
+.topic-card-desc-input:focus{border-color:var(--accent);background:var(--bg);}
+.cf-landing-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);margin-top:8px;cursor:pointer;user-select:none;}
+.cf-landing-toggle input{cursor:pointer;}
 ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px;}
 </style>
 </head>
@@ -306,10 +349,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 
 <header class="header" id="mainHeader" style="display:none;">
   <div class="header-logo"><i class="ti ti-hand-finger"></i><div><div class="header-logo-text">SignBiz</div><div class="header-logo-sub">Business Sign Language</div></div></div>
-  <nav class="header-nav">
-    <div class="nav-item active" id="navDict" onclick="showPage('dict')">Dictionary</div>
-    <div class="nav-item" id="navAbout" onclick="showPage('about')">About</div>
-  </nav>
+  <nav class="header-nav" id="headerNav"></nav>
   <div class="header-search"><i class="ti ti-search"></i><input type="text" id="globalSearch" placeholder="Search signs..." oninput="doFilter()"/></div>
   <div class="lang-toggle">
     <button class="lang-btn active" onclick="setLang('en')">EN</button>
@@ -317,11 +357,55 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   </div>
   <div class="header-right">
     <div class="header-user" id="headerUser" style="display:none;"></div>
+    <button class="hdr-btn" id="navManageBtn" style="display:none;" onclick="toggleNavManageMode()"><i class="ti ti-arrows-move"></i> Manage nav</button>
     <button class="hdr-btn" id="adminNavBtn" style="display:none;" onclick="showPage('admin')"><i class="ti ti-settings"></i> Manage</button>
     <button class="hdr-btn" id="loginNavBtn" onclick="showPage('login')"><i class="ti ti-login"></i> Admin Login</button>
     <button class="hdr-btn" id="logoutBtn" style="display:none;" onclick="doLogout()"><i class="ti ti-logout"></i> Sign out</button>
   </div>
 </header>
+
+<div class="page" id="pageTopics">
+  <div class="topics-wrap">
+    <div class="topics-hero">
+      <button class="btn topics-hero-edit-btn" id="topicsHeroEditBtn" style="display:none;" onclick="enterTopicsHeroEdit()"><i class="ti ti-edit"></i> Edit</button>
+      <div id="topicsHeroView">
+        <h1 id="topicsHeroTitle">Browse by topic</h1>
+        <p id="topicsHeroBody">Choose a subject to see the business signs that belong to it, or jump straight to the full dictionary.</p>
+      </div>
+      <div class="topics-hero-form" id="topicsHeroForm" style="display:none;">
+        <div class="form-field"><label>Title</label><input type="text" id="topicsHeroTitleInput"/></div>
+        <div class="form-field"><label>Description</label><textarea id="topicsHeroBodyInput"></textarea></div>
+        <div class="form-footer"><button class="btn" onclick="cancelTopicsHeroEdit()">Cancel</button><button class="btn btn-primary" onclick="saveTopicsHeroContent()">Save</button></div>
+      </div>
+    </div>
+    <div class="topics-toolbar" id="topicsToolbar" style="display:none;">
+      <button class="btn" id="topicsManageBtn" onclick="toggleTopicsManageMode()"><i class="ti ti-adjustments-horizontal"></i> Manage cards</button>
+    </div>
+    <div class="topics-grid" id="topicsGrid"></div>
+  </div>
+</div>
+
+<div class="page" id="pageCategoryOptions">
+  <div class="topics-wrap">
+    <button class="btn" style="margin-bottom:18px;" onclick="showPage('topics')"><i class="ti ti-arrow-left"></i> Back to Topics</button>
+    <div class="topics-hero">
+      <button class="btn topics-hero-edit-btn" id="catOptHeroEditBtn" style="display:none;" onclick="enterCatOptHeroEdit()"><i class="ti ti-edit"></i> Edit</button>
+      <div id="catOptHeroView">
+        <h1 id="catOptHeroTitle">Category</h1>
+        <p id="catOptHeroBody"></p>
+      </div>
+      <div class="topics-hero-form" id="catOptHeroForm" style="display:none;">
+        <div class="form-field"><label>Title</label><input type="text" id="catOptHeroTitleInput"/></div>
+        <div class="form-field"><label>Description</label><textarea id="catOptHeroBodyInput"></textarea></div>
+        <div class="form-footer"><button class="btn" onclick="cancelCatOptHeroEdit()">Cancel</button><button class="btn btn-primary" onclick="saveCatOptHeroContent()">Save</button></div>
+      </div>
+    </div>
+    <div class="topics-toolbar" id="catOptToolbar" style="display:none;">
+      <button class="btn" id="catOptManageBtn" onclick="toggleCatOptManageMode()"><i class="ti ti-adjustments-horizontal"></i> Manage cards</button>
+    </div>
+    <div class="topics-grid" id="catOptGrid"></div>
+  </div>
+</div>
 
 <div class="page" id="pageDict">
   <div class="hs-strip">
@@ -706,6 +790,8 @@ async function refreshAfterReviewAction(){
   await loadAll();
   await loadPendingReviews();
   buildFilterPanel(); buildFilterTags(); buildHsGrid(); doFilter();
+  rerenderActiveLandingSurface();
+  renderHeaderNav();
   if(document.getElementById('pageAdmin').classList.contains('active')){
     renderAdminTable();
     if(document.getElementById('apReview')?.classList.contains('active')) renderPendingReviewsAdmin();
@@ -1084,17 +1170,28 @@ onAuthStateChanged(auth, async user=>{
   // Refresh detail panel (feedback box depends on login state) and admin tables
   if(activeWord){ const w=WORDS.find(x=>x.id===activeWord); if(w) renderDetail(w); }
   if(document.getElementById('pageAdmin').classList.contains('active')) (dataLoadedPromise||Promise.resolve()).then(renderAdminTable);
+  rerenderActiveLandingSurface();
+  renderHeaderNav();
   renderAboutView();
   if(isMainAdmin) refreshReviewBadge();
 });
 
 /* ══ PAGE ROUTING ══ */
-window.showPage=function(p){
+window.showPage=function(p,extra){
   if(p==='admin'&&!isAdmin){ showPage('login'); return; }
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  if(p!=='catopt') activeCatOptFieldId=null;
   if(p==='login'){ document.getElementById('pageLogin').classList.add('active'); }
-  else if(p==='dict'){ document.getElementById('pageDict').classList.add('active'); document.getElementById('navDict').classList.add('active'); }
+  else if(p==='topics'){ document.getElementById('pageTopics').classList.add('active'); document.querySelectorAll('.nav-item[data-page="topics"]').forEach(el=>el.classList.add('active')); (dataLoadedPromise||Promise.resolve()).then(renderTopicsLanding); }
+  else if(p==='catopt'){
+    activeCatOptFieldId=extra||null;
+    document.getElementById('pageCategoryOptions').classList.add('active');
+    document.querySelectorAll('.nav-item[data-page="topics"]').forEach(el=>el.classList.add('active'));
+    if(extra) document.querySelectorAll(`.nav-item[data-page="catopt"][data-field-id="${extra}"]`).forEach(el=>el.classList.add('active'));
+    if(extra) (dataLoadedPromise||Promise.resolve()).then(()=>renderCategoryOptionsPage(extra));
+  }
+  else if(p==='dict'){ document.getElementById('pageDict').classList.add('active'); document.querySelectorAll('.nav-item[data-page="dict"]').forEach(el=>el.classList.add('active')); }
   else if(p==='admin'){
     document.getElementById('pageAdmin').classList.add('active'); switchAdminTab('signs');
     const tbody=document.getElementById('adminTbody');
@@ -1104,7 +1201,7 @@ window.showPage=function(p){
     if(reviewTab){ reviewTab.style.display=isMainAdmin?'flex':'none'; }
     if(isMainAdmin) refreshReviewBadge();
   }
-  else if(p==='about'){ document.getElementById('pageAbout').classList.add('active'); document.getElementById('navAbout').classList.add('active'); }
+  else if(p==='about'){ document.getElementById('pageAbout').classList.add('active'); document.querySelectorAll('.nav-item[data-page="about"]').forEach(el=>el.classList.add('active')); }
 };
 
 window.setLang=function(lang){
@@ -1187,7 +1284,530 @@ function buildFilterTags(){
   });
 }
 
-/* ══ FILTER + LIST ══ */
+/* ══ TOPICS LANDING PAGE ══ */
+const TOPIC_ICONS=['ti-bulb','ti-briefcase','ti-chart-bar','ti-users','ti-target','ti-currency-dollar','ti-presentation','ti-mail','ti-calendar-event','ti-building','ti-handshake','ti-trending-up'];
+function iconFor(str){ let h=0; for(let i=0;i<str.length;i++) h=str.charCodeAt(i)+((h<<5)-h); return TOPIC_ICONS[Math.abs(h)%TOPIC_ICONS.length]; }
+let topicsManageMode=false;
+
+// Builds one combined, sorted list of "landing cards": every Topic (shown
+// by default — showOnLanding defaults to true if unset) plus any custom
+// category that opted in (showOnLanding defaults to false/unset for those,
+// since surfacing a custom field like "Region" is optional). Each entry
+// carries enough info to render the card AND to write back to the right
+// Firestore collection (colName) if it's edited, reordered, or removed.
+function landingCardItems(){
+  const fromTopics = TOPICS.map(t=>({...t, colName:'topics', field:'topic', kind:'topic'}))
+    .filter(t=>t.showOnLanding!==false);
+  const fromCustom = CUSTOM_FIELDS.map(cf=>({...cf, value:cf.name, colName:'customFields', field:'cf_'+cf.id, kind:'custom'}))
+    .filter(cf=>cf.showOnLanding===true);
+  return [...fromTopics, ...fromCustom].sort((a,b)=>(a.order??9999)-(b.order??9999));
+}
+
+function countForCard(item){
+  if(item.kind==='custom'){
+    // A custom-category card represents the whole category, not one
+    // option — count signs that have ANY value set for this field.
+    return WORDS.filter(w=>{
+      const v=w[item.field];
+      return Array.isArray(v) ? v.length>0 : !!v;
+    }).length;
+  }
+  return WORDS.filter(w=>{
+    const v=w[item.field];
+    const arr=Array.isArray(v)?v:(v?[v]:[]);
+    return arr.includes(item.value);
+  }).length;
+}
+
+window.renderTopicsLanding=function(){
+  const grid=document.getElementById('topicsGrid'); if(!grid) return;
+  const toolbar=document.getElementById('topicsToolbar');
+  if(toolbar) toolbar.style.display=isAdmin?'flex':'none';
+  const editBtn=document.getElementById('topicsHeroEditBtn');
+  if(editBtn) editBtn.style.display=isAdmin?'flex':'none';
+  const mgBtn=document.getElementById('topicsManageBtn');
+  if(mgBtn) mgBtn.innerHTML=topicsManageMode?'<i class="ti ti-check"></i> Done':'<i class="ti ti-adjustments-horizontal"></i> Manage cards';
+
+  const allCard=`<div class="topic-card all-signs" onclick="${topicsManageMode?'':"goToTopic(null)"}">
+      <div class="topic-card-icon"><i class="ti ti-list"></i></div>
+      <div class="topic-card-name">All signs</div>
+      <div class="topic-card-count">${WORDS.length} sign${WORDS.length===1?'':'s'}</div>
+    </div>`;
+
+  const items=landingCardItems();
+  if(!items.length){
+    grid.innerHTML=allCard+`<div class="topics-empty-state" style="grid-column:1/-1;"><i class="ti ti-category"></i>No topic cards yet. Add topics, or turn on a custom category, under Manage → Categories &amp; Tags.</div>`;
+    return;
+  }
+
+  const cards=items.map(item=>{
+    const count=countForCard(item);
+    const cc=colorFor(item.value);
+    const pending=item._pendingReviewId?`<span class="topic-card-pending">Pending removal review</span>`:'';
+    const desc=item.description?`<div class="topic-card-desc">${esc(item.description)}</div>`:'';
+    if(topicsManageMode){
+      return `<div class="topic-card manage-mode${count===0?' topic-card-empty':''}" draggable="true" data-cid="${item.colName}:${item.id}">
+        <span class="topic-card-drag-handle"><i class="ti ti-grip-vertical"></i></span>
+        <div class="topic-card-icon" style="background:${cc[0]};color:${cc[1]}"><i class="ti ${iconFor(item.value)}"></i></div>
+        <div class="topic-card-name">${esc(item.value)}</div>
+        <div class="topic-card-count">${count} sign${count===1?'':'s'}</div>
+        ${desc}${pending}
+        <div class="topic-card-mg-actions">
+          <button class="topic-card-mg-btn danger" onclick="event.stopPropagation();removeTopicsCard('${item.colName}','${item.id}')"><i class="ti ti-eye-off"></i> Remove card</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="topic-card${count===0?' topic-card-empty':''}" onclick="${item.kind==='topic'?`goToTopic('${esc(item.value)}')`:`goToCategoryOptions('${item.id}')`}">
+      <div class="topic-card-icon" style="background:${cc[0]};color:${cc[1]}"><i class="ti ${iconFor(item.value)}"></i></div>
+      <div class="topic-card-name">${esc(item.value)}</div>
+      <div class="topic-card-count">${count} sign${count===1?'':'s'}</div>
+      ${desc}
+    </div>`;
+  }).join('');
+  grid.innerHTML=allCard+cards;
+  if(topicsManageMode) wireTopicsDrag();
+};
+
+// Drag-to-reorder is display-only (like handshapes) — it writes straight
+// through for everyone, no review queue. Only removing a card is gated.
+function wireTopicsDrag(){
+  const grid=document.getElementById('topicsGrid');
+  let dragSrc=null;
+  grid.querySelectorAll('.topic-card[draggable="true"]').forEach(cell=>{
+    cell.addEventListener('dragstart', e=>{ dragSrc=cell.dataset.cid; cell.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+    cell.addEventListener('dragend', ()=>{ cell.classList.remove('dragging'); grid.querySelectorAll('.topic-card').forEach(c=>c.classList.remove('drag-over')); });
+    cell.addEventListener('dragover', e=>{ e.preventDefault(); if(cell.dataset.cid!==dragSrc) cell.classList.add('drag-over'); });
+    cell.addEventListener('dragleave', ()=>{ cell.classList.remove('drag-over'); });
+    cell.addEventListener('drop', async e=>{
+      e.preventDefault(); cell.classList.remove('drag-over');
+      if(!dragSrc || dragSrc===cell.dataset.cid) return;
+      await reorderTopicsCards(dragSrc, cell.dataset.cid);
+    });
+  });
+}
+
+async function reorderTopicsCards(srcCid, tgtCid){
+  const items=landingCardItems();
+  const srcIdx=items.findIndex(i=>`${i.colName}:${i.id}`===srcCid);
+  const tgtIdx=items.findIndex(i=>`${i.colName}:${i.id}`===tgtCid);
+  if(srcIdx===-1||tgtIdx===-1) return;
+  const [moved]=items.splice(srcIdx,1);
+  const newTgtIdx=items.findIndex(i=>`${i.colName}:${i.id}`===tgtCid);
+  items.splice(newTgtIdx,0,moved);
+  showSaving(true);
+  try{
+    const batch=writeBatch(db);
+    items.forEach((it,i)=>{
+      it.order=i;
+      const arr = it.colName==='topics' ? TOPICS : CUSTOM_FIELDS;
+      const live=arr.find(x=>x.id===it.id); if(live) live.order=i;
+      batch.set(doc(db,it.colName,it.id), {order:i}, {merge:true});
+    });
+    await batch.commit();
+  }catch(err){ console.error(err); showToast('⚠ Could not save new order.'); }
+  showSaving(false);
+  renderTopicsLanding();
+}
+
+window.toggleTopicsManageMode=function(){
+  topicsManageMode=!topicsManageMode;
+  renderTopicsLanding();
+};
+
+window.removeTopicsCard=async function(colName,id){
+  if(!confirm('Remove this card from the Topics landing page? The category and its signs are not affected — this only hides the card.')) return;
+  await toggleCategoryOnLanding(colName,id,false);
+  rerenderActiveLandingSurface();
+};
+
+// Topics are flat values — clicking one goes straight to the Dictionary,
+// pre-filtered. (Custom categories are a container with their own options
+// underneath, so they route through goToCategoryOptions instead — see below.)
+window.goToTopic=function(value){
+  showPage('dict');
+  resetFilters();
+  if(value){
+    const sel=document.getElementById('f_topic');
+    if(sel) sel.value=value;
+  }
+  doFilter();
+};
+
+// Custom categories (e.g. "Book") are a container: clicking the category
+// card/nav item opens a second-layer page listing its OPTIONS (e.g.
+// BUS201, BUS202) as cards. Only options that have at least one word
+// tagged are shown — unlike Topics-landing cards (which show even at zero
+// count, just faded), an option with zero words is fully filtered out here.
+window.goToCategoryOptions=function(fieldId){
+  showPage('catopt', fieldId);
+};
+
+/* ══ SECOND-LAYER CATEGORY-OPTIONS PAGE (e.g. Book → BUS201, BUS202) ══ */
+let catOptManageMode=false;
+
+function optionItemsFor(fieldId){
+  return CUSTOM_OPTIONS.filter(o=>o.fieldId===fieldId).sort((a,b)=>(a.order??9999)-(b.order??9999));
+}
+function countForOption(fieldId,value){
+  const field='cf_'+fieldId;
+  return WORDS.filter(w=>{
+    const v=w[field];
+    const arr=Array.isArray(v)?v:(v?[v]:[]);
+    return arr.includes(value);
+  }).length;
+}
+
+window.renderCategoryOptionsPage=function(fieldId){
+  const cf=CUSTOM_FIELDS.find(f=>f.id===fieldId);
+  const grid=document.getElementById('catOptGrid'); if(!grid) return;
+  if(!cf){ grid.innerHTML=`<div class="topics-empty-state" style="grid-column:1/-1;"><i class="ti ti-alert-circle"></i>This category no longer exists.</div>`; return; }
+
+  const toolbar=document.getElementById('catOptToolbar');
+  if(toolbar) toolbar.style.display=isAdmin?'flex':'none';
+  const editBtn=document.getElementById('catOptHeroEditBtn');
+  if(editBtn) editBtn.style.display=isAdmin?'flex':'none';
+  const mgBtn=document.getElementById('catOptManageBtn');
+  if(mgBtn) mgBtn.innerHTML=catOptManageMode?'<i class="ti ti-check"></i> Done':'<i class="ti ti-adjustments-horizontal"></i> Manage cards';
+
+  document.getElementById('catOptHeroTitle').textContent=cf.heroTitle||cf.name;
+  document.getElementById('catOptHeroBody').textContent=cf.heroBody||'';
+
+  // Real filtering, not just fading: an option with zero tagged words, or
+  // one a staff/admin turned off (showOnLanding===false), doesn't render
+  // here at all — different from the Topics-landing page, where unused
+  // cards still show (just faded) so admins can see what's empty.
+  let allOptions=optionItemsFor(fieldId);
+  let visibleOptions = allOptions
+    .map(o=>({...o, count:countForOption(fieldId,o.value)}))
+    .filter(o=>o.count>0 && o.showOnLanding!==false);
+
+  if(catOptManageMode){
+    // In manage mode, show every option (even zero-count / hidden ones)
+    // faded, so admins/staff can still find and toggle them back on.
+    visibleOptions = allOptions.map(o=>({...o, count:countForOption(fieldId,o.value)}));
+  }
+
+  if(!visibleOptions.length){
+    grid.innerHTML=`<div class="topics-empty-state" style="grid-column:1/-1;"><i class="ti ti-category"></i>No ${esc(cf.name)} options with signs yet.</div>`;
+    return;
+  }
+
+  const cards=visibleOptions.map(opt=>{
+    const cc=colorFor(opt.value);
+    const pending=opt._pendingReviewId?`<span class="topic-card-pending">Pending removal review</span>`:'';
+    const desc=opt.description?`<div class="topic-card-desc">${esc(opt.description)}</div>`:'';
+    const hidden = opt.showOnLanding===false || opt.count===0;
+    if(catOptManageMode){
+      return `<div class="topic-card manage-mode${hidden?' topic-card-empty':''}" draggable="true" data-cid="${opt.id}">
+        <span class="topic-card-drag-handle"><i class="ti ti-grip-vertical"></i></span>
+        <div class="topic-card-icon" style="background:${cc[0]};color:${cc[1]}"><i class="ti ${iconFor(opt.value)}"></i></div>
+        <div class="topic-card-name">${esc(opt.value)}</div>
+        <div class="topic-card-count">${opt.count} sign${opt.count===1?'':'s'}</div>
+        ${desc}${pending}
+        <div class="topic-card-mg-actions">
+          <button class="topic-card-mg-btn danger" onclick="event.stopPropagation();removeCatOptCard('${fieldId}','${opt.id}')"><i class="ti ti-eye-off"></i> Remove card</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="topic-card" onclick="goToCategoryOption('${fieldId}','${esc(opt.value)}')">
+      <div class="topic-card-icon" style="background:${cc[0]};color:${cc[1]}"><i class="ti ${iconFor(opt.value)}"></i></div>
+      <div class="topic-card-name">${esc(opt.value)}</div>
+      <div class="topic-card-count">${opt.count} sign${opt.count===1?'':'s'}</div>
+      ${desc}
+    </div>`;
+  }).join('');
+  grid.innerHTML=cards;
+  if(catOptManageMode) wireCatOptDrag(fieldId);
+};
+
+function wireCatOptDrag(fieldId){
+  const grid=document.getElementById('catOptGrid');
+  let dragSrc=null;
+  grid.querySelectorAll('.topic-card[draggable="true"]').forEach(cell=>{
+    cell.addEventListener('dragstart', e=>{ dragSrc=cell.dataset.cid; cell.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+    cell.addEventListener('dragend', ()=>{ cell.classList.remove('dragging'); grid.querySelectorAll('.topic-card').forEach(c=>c.classList.remove('drag-over')); });
+    cell.addEventListener('dragover', e=>{ e.preventDefault(); if(cell.dataset.cid!==dragSrc) cell.classList.add('drag-over'); });
+    cell.addEventListener('dragleave', ()=>{ cell.classList.remove('drag-over'); });
+    cell.addEventListener('drop', async e=>{
+      e.preventDefault(); cell.classList.remove('drag-over');
+      if(!dragSrc || dragSrc===cell.dataset.cid) return;
+      await reorderCatOptCards(fieldId, dragSrc, cell.dataset.cid);
+    });
+  });
+}
+
+async function reorderCatOptCards(fieldId, srcId, tgtId){
+  const items=optionItemsFor(fieldId);
+  const srcIdx=items.findIndex(i=>i.id===srcId);
+  const tgtIdx=items.findIndex(i=>i.id===tgtId);
+  if(srcIdx===-1||tgtIdx===-1) return;
+  const [moved]=items.splice(srcIdx,1);
+  const newTgtIdx=items.findIndex(i=>i.id===tgtId);
+  items.splice(newTgtIdx,0,moved);
+  showSaving(true);
+  try{
+    const batch=writeBatch(db);
+    items.forEach((it,i)=>{
+      it.order=i;
+      const live=CUSTOM_OPTIONS.find(x=>x.id===it.id); if(live) live.order=i;
+      batch.set(doc(db,'customFieldOptions',it.id), {order:i}, {merge:true});
+    });
+    await batch.commit();
+  }catch(err){ console.error(err); showToast('⚠ Could not save new order.'); }
+  showSaving(false);
+  renderCategoryOptionsPage(fieldId);
+}
+
+window.toggleCatOptManageMode=function(){
+  catOptManageMode=!catOptManageMode;
+  renderCategoryOptionsPage(activeCatOptFieldId);
+};
+
+window.removeCatOptCard=async function(fieldId,optId){
+  if(!confirm('Remove this card from this category page? The option and its signs are not affected — this only hides the card.')) return;
+  await toggleCategoryOnLanding('customFieldOptions',optId,false);
+};
+
+// Clicking an option card (e.g. BUS201) is the bottom of the hierarchy —
+// it jumps to the Dictionary filtered to signs carrying that option value
+// for this specific custom field.
+window.goToCategoryOption=function(fieldId,value){
+  showPage('dict');
+  resetFilters();
+  const sel=document.getElementById('f_cf_'+fieldId);
+  if(sel) sel.value=value;
+  doFilter();
+};
+
+/* ── Per-category hero text (stored on the customFields/{id} doc itself,
+   since each category's second-layer page needs its own title/blurb —
+   unlike the single shared Topics-landing hero in siteContent) ── */
+window.enterCatOptHeroEdit=function(){
+  const cf=CUSTOM_FIELDS.find(f=>f.id===activeCatOptFieldId); if(!cf) return;
+  document.getElementById('catOptHeroTitleInput').value=cf.heroTitle||cf.name;
+  document.getElementById('catOptHeroBodyInput').value=cf.heroBody||'';
+  document.getElementById('catOptHeroView').style.display='none';
+  document.getElementById('catOptHeroEditBtn').style.display='none';
+  document.getElementById('catOptHeroForm').style.display='block';
+};
+window.cancelCatOptHeroEdit=function(){
+  document.getElementById('catOptHeroView').style.display='';
+  document.getElementById('catOptHeroEditBtn').style.display=isAdmin?'flex':'none';
+  document.getElementById('catOptHeroForm').style.display='none';
+};
+window.saveCatOptHeroContent=async function(){
+  const cf=CUSTOM_FIELDS.find(f=>f.id===activeCatOptFieldId); if(!cf) return;
+  const title=document.getElementById('catOptHeroTitleInput').value.trim()||cf.name;
+  const body=document.getElementById('catOptHeroBodyInput').value.trim();
+  showSaving(true);
+  try{ await setDoc(doc(db,'customFields',cf.id),{heroTitle:title,heroBody:body},{merge:true}); }
+  catch(err){ console.error('saveCatOptHeroContent failed:',err); showToast('⚠ Could not save. Try again.'); showSaving(false); return; }
+  showSaving(false);
+  cf.heroTitle=title; cf.heroBody=body;
+  cancelCatOptHeroEdit();
+  renderCategoryOptionsPage(cf.id);
+  showToast('Category page header updated');
+};
+
+/* ══ ABOUT-STYLE HERO TEXT FOR TOPICS LANDING (siteContent/topicsLanding) ══ */
+let TOPICS_HERO={
+  title:'Browse by topic',
+  body:'Choose a subject to see the business signs that belong to it, or jump straight to the full dictionary.'
+};
+async function loadTopicsHeroContent(){
+  try{
+    const snap=await getDoc(doc(db,'siteContent','topicsLanding'));
+    if(snap.exists()){
+      const d=snap.data();
+      if(d.title) TOPICS_HERO.title=d.title;
+      if(d.body)  TOPICS_HERO.body=d.body;
+    }
+  }catch(err){ console.error('loadTopicsHeroContent failed:',err); }
+  renderTopicsHeroView();
+}
+function renderTopicsHeroView(){
+  const tEl=document.getElementById('topicsHeroTitle');
+  const bEl=document.getElementById('topicsHeroBody');
+  if(tEl) tEl.textContent=TOPICS_HERO.title;
+  if(bEl) bEl.textContent=TOPICS_HERO.body;
+}
+window.enterTopicsHeroEdit=function(){
+  document.getElementById('topicsHeroTitleInput').value=TOPICS_HERO.title;
+  document.getElementById('topicsHeroBodyInput').value=TOPICS_HERO.body;
+  document.getElementById('topicsHeroView').style.display='none';
+  document.getElementById('topicsHeroEditBtn').style.display='none';
+  document.getElementById('topicsHeroForm').style.display='block';
+};
+window.cancelTopicsHeroEdit=function(){
+  document.getElementById('topicsHeroView').style.display='';
+  document.getElementById('topicsHeroEditBtn').style.display=isAdmin?'flex':'none';
+  document.getElementById('topicsHeroForm').style.display='none';
+};
+window.saveTopicsHeroContent=async function(){
+  const title=document.getElementById('topicsHeroTitleInput').value.trim()||'Browse by topic';
+  const body=document.getElementById('topicsHeroBodyInput').value.trim();
+  showSaving(true);
+  try{ await setDoc(doc(db,'siteContent','topicsLanding'),{title,body},{merge:true}); }
+  catch(err){ console.error('saveTopicsHeroContent failed:',err); showToast('⚠ Could not save. Try again.'); showSaving(false); return; }
+  showSaving(false);
+  TOPICS_HERO.title=title; TOPICS_HERO.body=body;
+  renderTopicsHeroView();
+  cancelTopicsHeroEdit();
+  showToast('Topics page header updated');
+};
+
+/* ══════════════════════════════════════
+   TOP NAV BAR — admin-configurable order + optional custom-category items
+   Independent from the Topics-landing-page card system (separate switch:
+   showInNav vs showOnLanding). Order lives in siteContent/navOrder as a
+   single ordered list mixing the 3 fixed items (Topics/Dictionary/About)
+   with any custom category that has opted in. Fixed items can be dragged
+   too — nothing about their position is hardcoded once this loads.
+══════════════════════════════════════ */
+const NAV_FIXED_DEFS={
+  topics:{label:'Topics',  page:'topics'},
+  dict:  {label:'Dictionary', page:'dict'},
+  about: {label:'About',   page:'about'}
+};
+let NAV_ORDER=[ {type:'fixed',key:'topics'}, {type:'fixed',key:'dict'}, {type:'fixed',key:'about'} ];
+let navManageMode=false;
+let activeCatOptFieldId=null; // which custom category's options page is currently shown, if any
+let navDragSrc=null;
+
+async function loadNavOrder(){
+  try{
+    const snap=await getDoc(doc(db,'siteContent','navOrder'));
+    if(snap.exists() && Array.isArray(snap.data().items) && snap.data().items.length){
+      NAV_ORDER=snap.data().items;
+    }
+  }catch(err){ console.error('loadNavOrder failed:',err); }
+}
+
+// Builds the renderable nav list: fixed items always included; custom
+// items only if they exist AND have showInNav===true. Any custom field
+// with showInNav===true that isn't yet in NAV_ORDER (e.g. just turned on)
+// is appended at the end — it still renders even before anyone reorders it.
+function navRenderList(){
+  const list=[];
+  NAV_ORDER.forEach(entry=>{
+    if(entry.type==='fixed'){
+      if(NAV_FIXED_DEFS[entry.key]) list.push({...entry, ...NAV_FIXED_DEFS[entry.key]});
+    } else {
+      const cf=CUSTOM_FIELDS.find(f=>f.id===entry.fieldId);
+      if(cf && cf.showInNav===true) list.push({type:'custom', fieldId:cf.id, label:cf.name, page:'catopt', _pendingReviewId:cf._pendingReviewId});
+    }
+  });
+  CUSTOM_FIELDS.forEach(cf=>{
+    if(cf.showInNav===true && !NAV_ORDER.some(e=>e.type==='custom'&&e.fieldId===cf.id)){
+      list.push({type:'custom', fieldId:cf.id, label:cf.name, page:'catopt', _pendingReviewId:cf._pendingReviewId});
+    }
+  });
+  return list;
+}
+
+window.renderHeaderNav=function(){
+  const nav=document.getElementById('headerNav'); if(!nav) return;
+  const mgBtn=document.getElementById('navManageBtn');
+  if(mgBtn) mgBtn.style.display=isAdmin?'flex':'none';
+  if(mgBtn) mgBtn.innerHTML=navManageMode?'<i class="ti ti-check"></i> Done':'<i class="ti ti-arrows-move"></i> Manage nav';
+
+  const currentActive = document.querySelector('.page.active')?.id;
+  const activePage = (currentActive==='pageTopics'||currentActive==='pageCategoryOptions') ? 'topics' : currentActive==='pageDict'?'dict' : currentActive==='pageAbout'?'about' : '';
+  const activeFieldId = currentActive==='pageCategoryOptions' ? activeCatOptFieldId : null;
+
+  nav.innerHTML='';
+  navRenderList().forEach(item=>{
+    const el=document.createElement('div');
+    const isItemActive = item.page===activePage && (item.type!=='custom' || item.fieldId===activeFieldId);
+    el.className='nav-item'+(isItemActive?' active':'');
+    el.dataset.page=item.page;
+    if(item.type==='custom') el.dataset.fieldId=item.fieldId;
+    if(navManageMode){
+      el.classList.add('nav-manage-mode');
+      el.draggable=true;
+      el.dataset.navKey = item.type==='fixed' ? `fixed:${item.key}` : `custom:${item.fieldId}`;
+      const pendingNote = item._pendingReviewId ? ' title="Pending removal review"' : '';
+      el.innerHTML = `<span${pendingNote}>${esc(item.label)}${item._pendingReviewId?' <i class="ti ti-clock" style="font-size:11px;"></i>':''}</span>` +
+        (item.type==='custom' ? `<span class="nav-item-remove" onclick="event.stopPropagation();removeNavItem('${item.fieldId}')"><i class="ti ti-x" style="font-size:11px;"></i></span>` : '');
+      el.addEventListener('dragstart', e=>{ navDragSrc=el.dataset.navKey; el.classList.add('nav-dragging'); e.dataTransfer.effectAllowed='move'; });
+      el.addEventListener('dragend', ()=>{ el.classList.remove('nav-dragging'); nav.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('nav-drag-over')); });
+      el.addEventListener('dragover', e=>{ e.preventDefault(); if(el.dataset.navKey!==navDragSrc) el.classList.add('nav-drag-over'); });
+      el.addEventListener('dragleave', ()=>{ el.classList.remove('nav-drag-over'); });
+      el.addEventListener('drop', async e=>{
+        e.preventDefault(); el.classList.remove('nav-drag-over');
+        if(!navDragSrc || navDragSrc===el.dataset.navKey) return;
+        await reorderNavItems(navDragSrc, el.dataset.navKey);
+      });
+    } else {
+      el.textContent=item.label;
+      el.onclick = item.type==='custom' ? ()=>goToCategoryOptions(item.fieldId) : ()=>showPage(item.page);
+    }
+    nav.appendChild(el);
+  });
+};
+
+window.toggleNavManageMode=function(){
+  navManageMode=!navManageMode;
+  renderHeaderNav();
+};
+
+// Reordering the nav is display-only — writes straight through for
+// everyone (main admin or staff), no review queue, same as handshape
+// and topic-card reordering.
+async function reorderNavItems(srcKey, tgtKey){
+  const keyOf=e=>e.type==='fixed'?`fixed:${e.key}`:`custom:${e.fieldId}`;
+  // Make sure every rendered item (including just-appended new custom
+  // ones not yet in NAV_ORDER) is represented before reordering.
+  const present=new Set(NAV_ORDER.map(keyOf));
+  navRenderList().forEach(item=>{
+    const k=item.type==='fixed'?`fixed:${item.key}`:`custom:${item.fieldId}`;
+    if(!present.has(k)){ NAV_ORDER.push(item.type==='fixed'?{type:'fixed',key:item.key}:{type:'custom',fieldId:item.fieldId}); present.add(k); }
+  });
+  const srcIdx=NAV_ORDER.findIndex(e=>keyOf(e)===srcKey);
+  const tgtIdx=NAV_ORDER.findIndex(e=>keyOf(e)===tgtKey);
+  if(srcIdx===-1||tgtIdx===-1) return;
+  const [moved]=NAV_ORDER.splice(srcIdx,1);
+  const newTgtIdx=NAV_ORDER.findIndex(e=>keyOf(e)===tgtKey);
+  NAV_ORDER.splice(newTgtIdx,0,moved);
+  showSaving(true);
+  try{ await setDoc(doc(db,'siteContent','navOrder'),{items:NAV_ORDER}); }
+  catch(err){ console.error(err); showToast('⚠ Could not save nav order.'); }
+  showSaving(false);
+  renderHeaderNav();
+}
+
+// Removing a custom category's nav item works exactly like
+// toggleCategoryOnLanding, but on the showInNav field instead of
+// showOnLanding — a fully independent switch on the same customFields doc.
+// Main Admin: immediate. Staff: optimistic hide + pendingReview, with the
+// nav item reappearing if Main Admin rejects the review.
+window.toggleCategoryInNav=async function(fieldId,showOn){
+  const item=CUSTOM_FIELDS.find(x=>x.id===fieldId); if(!item) return;
+  const before={...item};
+  item.showInNav=showOn;
+  renderHeaderNav();
+  if(showOn || isMainAdmin){
+    try{ await setDoc(doc(db,'customFields',fieldId), {showInNav:showOn, _pendingReviewId:null}, {merge:true}); }
+    catch(err){ console.error(err); showToast('⚠ Could not save. Try again.'); item.showInNav=before.showInNav; renderHeaderNav(); return; }
+    item._pendingReviewId=null;
+    showToast(showOn?'Added to top navigation':'Removed from top navigation');
+  } else {
+    try{
+      await setDoc(doc(db,'customFields',fieldId), {showInNav:false}, {merge:true});
+      const reviewId=await createPendingReview('customFields', fieldId, item.name, 'edit', before, {...item, showInNav:false});
+      await setDoc(doc(db,'customFields',fieldId), {_pendingReviewId:reviewId}, {merge:true});
+      item._pendingReviewId=reviewId;
+    }catch(err){ console.error(err); showToast('⚠ Could not save. Try again.'); }
+    showToast('Removed from nav — sent to Main Admin for review');
+  }
+};
+
+window.removeNavItem=async function(fieldId){
+  if(!confirm('Remove this from the top navigation? The category and its signs are not affected — this only hides the nav item.')) return;
+  await toggleCategoryInNav(fieldId,false);
+};
+
+
 window.doFilter=function(){
   const q=(document.getElementById('globalSearch').value||'').trim().toLowerCase();
   const fHand=document.getElementById('fHand')?.value||'';
@@ -1708,13 +2328,13 @@ function renderOptionsPanel(){
 function appendBuiltinCard(wrap,title,colName,items,type,key,subtitle,wide=false){
   const card=makeBuiltinCard(title,colName,type,key,subtitle,wide);
   wrap.appendChild(card);
-  renderValueRows('blt_'+key,items,wide,(id,val)=>renameBuiltinValue(colName,key,id,val),(id)=>deleteBuiltinValue(colName,key,id));
+  renderValueRows('blt_'+key,items,wide,(id,val)=>renameBuiltinValue(colName,key,id,val),(id)=>deleteBuiltinValue(colName,key,id),colName);
 }
 
 function appendCustomCard(wrap,cf,items){
   const card=makeCustomCard(cf);
   wrap.appendChild(card);
-  renderValueRows('cst_'+cf.id,items,false,(id,val)=>renameCustomValue(cf.id,id,val),(id)=>deleteCustomValue(cf.id,id));
+  renderValueRows('cst_'+cf.id,items,false,(id,val)=>renameCustomValue(cf.id,id,val),(id)=>deleteCustomValue(cf.id,id),'customFieldOptions');
 }
 
 function makeBuiltinCard(title,colName,type,key,subtitle,wide=false){
@@ -1739,22 +2359,57 @@ function makeCustomCard(cf){
       <button class="row-btn del" onclick="deleteCustomCategory('${cf.id}')" title="Delete this category"><i class="ti ti-trash"></i></button>
     </div>
     <div class="options-card-sub">Custom category — appears in sign editor and filters.</div>
+    <label class="cf-landing-toggle"><input type="checkbox" id="cfLanding_${cf.id}" ${cf.showOnLanding?'checked':''} onchange="toggleCategoryOnLanding('customFields','${cf.id}',this.checked)"/> Show as a card on the Topics landing page</label>
+    <label class="cf-landing-toggle"><input type="checkbox" id="cfNav_${cf.id}" ${cf.showInNav?'checked':''} onchange="toggleCategoryInNav('${cf.id}',this.checked)"/> Show as a top navigation item</label>
+    <textarea class="topic-card-desc-input" id="cfDesc_${cf.id}" placeholder="Optional description shown on the card..." onblur="saveCategoryCardDesc('customFields','${cf.id}',this.value)">${esc(cf.description||'')}</textarea>
     <div class="options-list" id="${listId}"></div>
     <div class="options-add-row"><input type="text" id="newc_${cf.id}" placeholder="New value..." onkeydown="if(event.key==='Enter')addCustomValue('${cf.id}')"/><button onclick="addCustomValue('${cf.id}')">Add</button></div>
   `;
   return card;
 }
 
-function renderValueRows(listId,items,wide,onRename,onDelete){
+function renderValueRows(listId,items,wide,onRename,onDelete,colName){
   const el=document.getElementById(listId); if(!el) return;
   el.innerHTML='';
   if(!items.length){ el.innerHTML='<p style="font-size:11px;color:var(--text3);padding:4px 2px;">No options yet — add one below.</p>'; return; }
+  const isTopics=colName==='topics';
+  const isCustomOpt=colName==='customFieldOptions';
   items.forEach(item=>{
     const row=document.createElement('div');
     if(wide){
       row.style.cssText='display:flex;align-items:center;gap:4px;background:var(--bg2);border:0.5px solid var(--border);border-radius:20px;padding:3px 4px 3px 10px;';
       row.innerHTML=`<span style="font-size:12px;">${esc(item.value)}</span><button class="option-row-del" style="width:20px;height:20px;border-radius:50%;"><i class="ti ti-x" style="font-size:11px;"></i></button>`;
       row.querySelector('button').onclick=()=>onDelete(item.id);
+    } else if(isTopics){
+      row.className='option-row'; row.style.flexDirection='column'; row.style.alignItems='stretch'; row.style.gap='6px';
+      const showOn=item.showOnLanding!==false; // topics default to shown
+      row.innerHTML=`
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="text" value="${esc(item.value)}" style="flex:1;border:none;background:transparent;font-size:13px;color:var(--text);outline:none;"/>
+          <button class="option-row-del"><i class="ti ti-x"></i></button>
+        </div>
+        <label class="cf-landing-toggle" style="margin:0;"><input type="checkbox" ${showOn?'checked':''}/> Show as a card on the Topics landing page</label>
+        <textarea class="topic-card-desc-input" placeholder="Optional description shown on the card..." style="margin:0;">${esc(item.description||'')}</textarea>
+      `;
+      row.querySelector('input[type="text"]').onchange=(e)=>onRename(item.id,e.target.value);
+      row.querySelector('button').onclick=()=>onDelete(item.id);
+      row.querySelector('input[type="checkbox"]').onchange=(e)=>toggleCategoryOnLanding('topics',item.id,e.target.checked);
+      row.querySelector('textarea').onblur=(e)=>saveCategoryCardDesc('topics',item.id,e.target.value);
+    } else if(isCustomOpt){
+      row.className='option-row'; row.style.flexDirection='column'; row.style.alignItems='stretch'; row.style.gap='6px';
+      const showOn=item.showOnLanding!==false; // options default to shown (the category-level switch is the real opt-in gate)
+      row.innerHTML=`
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="text" value="${esc(item.value)}" style="flex:1;border:none;background:transparent;font-size:13px;color:var(--text);outline:none;"/>
+          <button class="option-row-del"><i class="ti ti-x"></i></button>
+        </div>
+        <label class="cf-landing-toggle" style="margin:0;"><input type="checkbox" ${showOn?'checked':''}/> Show as a card on this category's page</label>
+        <textarea class="topic-card-desc-input" placeholder="Optional description shown on the card..." style="margin:0;">${esc(item.description||'')}</textarea>
+      `;
+      row.querySelector('input[type="text"]').onchange=(e)=>onRename(item.id,e.target.value);
+      row.querySelector('button').onclick=()=>onDelete(item.id);
+      row.querySelector('input[type="checkbox"]').onchange=(e)=>toggleCategoryOnLanding('customFieldOptions',item.id,e.target.checked);
+      row.querySelector('textarea').onblur=(e)=>saveCategoryCardDesc('customFieldOptions',item.id,e.target.value);
     } else {
       row.className='option-row';
       row.innerHTML=`<input type="text" value="${esc(item.value)}"/><button class="option-row-del"><i class="ti ti-x"></i></button>`;
@@ -1764,6 +2419,64 @@ function renderValueRows(listId,items,wide,onRename,onDelete){
     el.appendChild(row);
   });
 }
+
+// ── Landing-card visibility & description (shared by Topics-landing
+// cards, top-nav items, AND second-layer category-option cards) ──
+// "showOnLanding" only controls whether a card appears on its landing
+// surface — it never touches the underlying topic/customField/option
+// value, the signs tagged with it, or any other data. Turning a card OFF
+// is the one action here that gets review-gated for staff (Main Admin
+// acts immediately either way): the card disappears right away for
+// everyone (optimistic), but a staff toggle-off also files a
+// pendingReview so Main Admin can restore it. Turning a card ON is never
+// review-gated — only "removing" something from public view needs a check.
+function arrFor(colName){
+  if(colName==='topics') return TOPICS;
+  if(colName==='customFieldOptions') return CUSTOM_OPTIONS;
+  return CUSTOM_FIELDS;
+}
+function rerenderActiveLandingSurface(){
+  if(document.getElementById('pageTopics')?.classList.contains('active')) renderTopicsLanding();
+  if(document.getElementById('pageCategoryOptions')?.classList.contains('active') && activeCatOptFieldId) renderCategoryOptionsPage(activeCatOptFieldId);
+}
+window.toggleCategoryOnLanding=async function(colName,id,showOn){
+  const arr = arrFor(colName);
+  const item = arr.find(x=>x.id===id); if(!item) return;
+  const before = {...item};
+  item.showOnLanding = showOn; // optimistic local update — card list re-renders immediately
+  rerenderActiveLandingSurface();
+  if(showOn || isMainAdmin){
+    // Turning on, OR Main Admin turning off: write straight through, no
+    // review. Also clears any stale _pendingReviewId so a card that was
+    // previously flagged for staff removal doesn't keep showing the
+    // "pending review" badge once it's back in normal (or main-admin) hands.
+    try{ await setDoc(doc(db,colName,id), {showOnLanding:showOn, _pendingReviewId:null}, {merge:true}); }
+    catch(err){ console.error(err); showToast('⚠ Could not save. Try again.'); item.showOnLanding=before.showOnLanding; rerenderActiveLandingSurface(); return; }
+    item._pendingReviewId=null;
+    showToast(showOn?'Card shown':'Card removed');
+  } else {
+    // Staff turning off: write through now (so the optimistic hide is
+    // real, not just local) but leave the prior state in a pendingReview.
+    try{
+      await setDoc(doc(db,colName,id), {showOnLanding:false}, {merge:true});
+      const reviewId = await createPendingReview(colName, id, item.value||item.name, 'edit', before, {...item, showOnLanding:false});
+      await setDoc(doc(db,colName,id), {_pendingReviewId:reviewId}, {merge:true});
+      item._pendingReviewId=reviewId;
+    }catch(err){ console.error(err); showToast('⚠ Could not save. Try again.'); }
+    showToast('Card removed — sent to Main Admin for review');
+  }
+};
+
+window.saveCategoryCardDesc=async function(colName,id,desc){
+  const arr = arrFor(colName);
+  const item = arr.find(x=>x.id===id); if(!item) return;
+  desc=desc.trim();
+  if(item.description===desc) return; // no change, skip the write
+  item.description=desc;
+  try{ await setDoc(doc(db,colName,id), {description:desc}, {merge:true}); }
+  catch(err){ console.error(err); showToast('⚠ Could not save description.'); return; }
+  rerenderActiveLandingSurface();
+};
 
 window.addBuiltinValue=async function(colName,key){
   const inp=document.getElementById('new_'+key);
@@ -1775,7 +2488,7 @@ window.addBuiltinValue=async function(colName,key){
   inp.value='';
   buildFilterPanel(); buildFilterTags();
   const wide=colName==='tags';
-  renderValueRows('blt_'+key, arr, wide, (id,v)=>renameBuiltinValue(colName,key,id,v), (id)=>deleteBuiltinValue(colName,key,id));
+  renderValueRows('blt_'+key, arr, wide, (id,v)=>renameBuiltinValue(colName,key,id,v), (id)=>deleteBuiltinValue(colName,key,id), colName);
   showToast(`"${val}" added`);
 };
 
@@ -1815,7 +2528,7 @@ window.deleteBuiltinValue=async function(colName,key,id){
   if(colName==='tags') buildFilterTags();
   buildFilterPanel(); doFilter();
   const wide=colName==='tags';
-  renderValueRows('blt_'+key, arr, wide, (rid,v)=>renameBuiltinValue(colName,key,rid,v), (rid)=>deleteBuiltinValue(colName,key,rid));
+  renderValueRows('blt_'+key, arr, wide, (rid,v)=>renameBuiltinValue(colName,key,rid,v), (rid)=>deleteBuiltinValue(colName,key,rid), colName);
   showToast('Deleted');
 };
 
@@ -1880,7 +2593,7 @@ window.addCustomValue=async function(fieldId){
   inp.value='';
   buildFilterPanel();
   const opts=CUSTOM_OPTIONS.filter(o=>o.fieldId===fieldId);
-  renderValueRows('cst_'+fieldId, opts, false, (id,v)=>renameCustomValue(fieldId,id,v), (id)=>deleteCustomValue(fieldId,id));
+  renderValueRows('cst_'+fieldId, opts, false, (id,v)=>renameCustomValue(fieldId,id,v), (id)=>deleteCustomValue(fieldId,id), 'customFieldOptions');
   showToast(`"${val}" added`);
 };
 
@@ -1917,7 +2630,7 @@ window.deleteCustomValue=async function(fieldId,optId){
   });
   buildFilterPanel(); doFilter();
   const opts=CUSTOM_OPTIONS.filter(o=>o.fieldId===fieldId);
-  renderValueRows('cst_'+fieldId, opts, false, (id,v)=>renameCustomValue(fieldId,id,v), (id)=>deleteCustomValue(fieldId,id));
+  renderValueRows('cst_'+fieldId, opts, false, (id,v)=>renameCustomValue(fieldId,id,v), (id)=>deleteCustomValue(fieldId,id), 'customFieldOptions');
   showToast('Deleted');
 };
 
@@ -2108,10 +2821,13 @@ async function init(){
   try{ await dataLoadedPromise; }
   catch(e){ console.error(e); showToast('⚠ Firebase connection error. Check your config and Firestore rules.'); }
   await loadAboutContent();
+  await loadTopicsHeroContent();
+  await loadNavOrder();
+  renderHeaderNav();
   document.getElementById('appLoading').style.display='none';
   document.getElementById('mainHeader').style.display='flex';
   buildFilterPanel(); buildFilterTags(); buildHsGrid(); doFilter();
-  showPage('dict');
+  showPage('topics');
 }
 init();
 </script>
