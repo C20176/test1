@@ -2528,7 +2528,7 @@ function renderDetail(w){
 
   // Researcher-only fields section (only visible to researchers and admins)
   const researcherDefs=CUSTOM_FIELDS.filter(cf=>cf.researcherOnly && (isAdmin||isResearcher));
-  const viewDataBtn=(isAdmin||isResearcher)?`<button class="view-data-btn" onclick="openVdModal('${esc(w.en)}')"><i class="ti ti-table"></i> View Data</button>`:'';
+  const viewDataBtn=(isAdmin||isResearcher)?`<button class="view-data-btn" onclick="openVdModal('${esc(w.en)}',${typeof w.signDataTokenIndex==='number'?w.signDataTokenIndex:'undefined'})"><i class="ti ti-table"></i> View Data</button>`:'';
   const researcherHtml=(researcherDefs.length||isAdmin||isResearcher) ? `
     <div class="researcher-only-section">
       <div class="researcher-only-section-title"><i class="ti ti-microscope"></i> Researcher metadata</div>
