@@ -669,6 +669,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     <div class="admin-tab" id="atHandshapes" onclick="switchAdminTab('handshapes')">Handshape Images</div>
     <div class="admin-tab" id="atFeedback" onclick="switchAdminTab('feedback')">Feedback</div>
     <div class="admin-tab" id="atReview" style="display:none;" onclick="switchAdminTab('review')">Pending Review <span id="reviewCountBadge" class="fb-badge" style="display:none;background:var(--vexample-light);color:var(--vexample);margin-left:4px;">0</span></div>
+    <div class="admin-tab" id="atContacts" onclick="switchAdminTab('contacts')">Contacts</div>
     <div class="admin-tab" id="atElan" onclick="switchAdminTab('elan')">ELAN Data</div>
   </div>
 
@@ -727,6 +728,15 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     </div>
   </div>
 
+  <div class="admin-tab-panel" id="apContacts">
+    <div class="fb-admin-wrap">
+      <div class="fb-admin-filters">
+        <button class="btn" onclick="renderContactsAdmin()"><i class="ti ti-refresh"></i> Refresh</button>
+      </div>
+      <div id="contactAdminList"><p style="color:var(--text3);font-size:13px;">Loading messages…</p></div>
+    </div>
+  </div>
+
   <div class="admin-tab-panel" id="apElan">
     <div class="fb-admin-wrap" style="max-width:560px;">
       <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">
@@ -766,6 +776,108 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     </div>
 
     <button class="btn" style="margin-top:16px;" onclick="showPage('dict')"><i class="ti ti-arrow-left"></i> Back to dictionary</button>
+  </div>
+</div>
+
+<!-- ══ CONTACT PAGE ══ -->
+<div class="page" id="pageContact">
+  <div style="max-width:600px;margin:40px auto;padding:0 16px 40px;">
+    <!-- Admin-editable header -->
+    <div style="background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;margin-bottom:20px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <h2 id="contactTitleView" style="font-size:20px;font-weight:500;margin-bottom:8px;">Get in Touch</h2>
+        <button class="row-btn" id="contactEditBtn" style="display:none;flex-shrink:0;" onclick="enterContactEdit()"><i class="ti ti-edit"></i> Edit</button>
+      </div>
+      <div id="contactBodyView" style="color:var(--text2);line-height:1.7;white-space:pre-wrap;">Have a question about SignBiz? Fill in the form below and we'll get back to you.</div>
+      <div id="contactEditForm" style="display:none;margin-top:12px;">
+        <div class="form-field"><label>Title</label><input type="text" id="contactTitleInput"/></div>
+        <div class="form-field"><label>Body</label><textarea id="contactBodyInput" style="min-height:100px;"></textarea></div>
+        <div class="form-footer" style="margin-top:6px;">
+          <button class="btn" onclick="cancelContactEdit()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveContactContent()">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contact form -->
+    <div style="background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;">
+      <p style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:16px;">Send us a message</p>
+
+      <!-- Enquiry type -->
+      <div class="form-field">
+        <label>Type of enquiry *</label>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;" id="contactTypeGroup">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border-radius:var(--r-md);border:1px solid var(--border2);background:var(--bg2);" id="ctype_general">
+            <input type="radio" name="contactType" value="general" onchange="onContactTypeChange()" style="width:auto;height:auto;flex-shrink:0;"/> <span>💬 General question</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border-radius:var(--r-md);border:1px solid var(--border2);background:var(--bg2);" id="ctype_student">
+            <input type="radio" name="contactType" value="student" onchange="onContactTypeChange()" style="width:auto;height:auto;flex-shrink:0;"/> <span>🎓 HS student question</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border-radius:var(--r-md);border:1px solid var(--border2);background:var(--bg2);" id="ctype_teacher">
+            <input type="radio" name="contactType" value="teacher" onchange="onContactTypeChange()" style="width:auto;height:auto;flex-shrink:0;"/> <span>🏫 Teacher / educator</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border-radius:var(--r-md);border:1px solid var(--border2);background:var(--bg2);" id="ctype_researcher">
+            <input type="radio" name="contactType" value="researcher" onchange="onContactTypeChange()" style="width:auto;height:auto;flex-shrink:0;"/> <span>🔬 Researcher access request</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Researcher notice (shown only when researcher is selected) -->
+      <div id="contactResearcherNotice" style="display:none;background:#faf5ff;border:0.5px solid #c4b5fd;border-radius:var(--r-md);padding:14px;margin:-4px 0 12px;">
+        <p style="font-size:12px;font-weight:600;color:#7c3aed;display:flex;align-items:center;gap:5px;margin-bottom:6px;"><i class="ti ti-microscope"></i> Researcher access request</p>
+        <p style="font-size:12px;color:#6d28d9;line-height:1.6;">Please include your institution, research topic, and intended use of the data in your message. We'll review your request and follow up by email.</p>
+      </div>
+
+      <!-- Name -->
+      <div class="form-field">
+        <label>Your name *</label>
+        <input type="text" id="contactName" placeholder="First and last name"/>
+      </div>
+
+      <!-- Organisation (shown for teacher and researcher) -->
+      <div class="form-field" id="contactOrgField" style="display:none;">
+        <label>Organisation / Institution *</label>
+        <input type="text" id="contactOrg" placeholder="School, university, or organisation name"/>
+      </div>
+
+      <!-- Email -->
+      <div class="form-field">
+        <label>Email address *</label>
+        <input type="email" id="contactEmail" placeholder="your@email.com"/>
+      </div>
+
+      <!-- Message -->
+      <div class="form-field">
+        <label>Message *</label>
+        <textarea id="contactMessage" style="min-height:140px;" placeholder="Tell us what's on your mind..."></textarea>
+      </div>
+
+      <!-- Error -->
+      <div id="contactError" style="display:none;font-size:12px;color:var(--danger);margin-bottom:10px;padding:8px 12px;background:var(--danger-light);border-radius:var(--r-sm);"></div>
+
+      <!-- Success -->
+      <div id="contactSuccess" style="display:none;font-size:13px;color:var(--success);padding:14px;background:var(--success-light);border-radius:var(--r-md);margin-bottom:10px;line-height:1.6;"></div>
+
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-primary" id="contactSubmitBtn" onclick="submitContactForm()"><i class="ti ti-send"></i> Send message</button>
+        <button class="btn" onclick="showPage('dict')"><i class="ti ti-arrow-left"></i> Back to dictionary</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Contact detail modal (admin view) -->
+<div class="modal-overlay" id="contactDetailModal">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-title">
+      <span id="contactDetailTitle">Message</span>
+      <span class="modal-close-x" onclick="closeContactDetailModal()"><i class="ti ti-x"></i></span>
+    </div>
+    <div id="contactDetailBody" style="font-size:13px;color:var(--text2);line-height:1.7;"></div>
+    <div class="form-footer" style="margin-top:16px;">
+      <button class="btn" onclick="closeContactDetailModal()">Close</button>
+      <button class="btn btn-primary" id="contactReplyBtn"><i class="ti ti-mail"></i> Reply by email</button>
+    </div>
   </div>
 </div>
 
@@ -1610,6 +1722,7 @@ onAuthStateChanged(auth, async user=>{
   rerenderActiveLandingSurface();
   renderHeaderNav();
   renderAboutView();
+  renderContactView();
   if(isMainAdmin) refreshReviewBadge();
 });
 
@@ -1697,6 +1810,7 @@ window.showPage=function(p,extra){
     if(isMainAdmin) refreshReviewBadge();
   }
   else if(p==='about'){ document.getElementById('pageAbout').classList.add('active'); document.querySelectorAll('.nav-item[data-page="about"]').forEach(el=>el.classList.add('active')); }
+  else if(p==='contact'){ document.getElementById('pageContact').classList.add('active'); document.querySelectorAll('.nav-item[data-page="contact"]').forEach(el=>el.classList.add('active')); renderContactView(); }
 };
 
 
@@ -2230,11 +2344,12 @@ window.saveTopicsHeroContent=async function(){
    too — nothing about their position is hardcoded once this loads.
 ══════════════════════════════════════ */
 const NAV_FIXED_DEFS={
-  topics:{label:'Topics',  page:'topics'},
-  dict:  {label:'Dictionary', page:'dict'},
-  about: {label:'About',   page:'about'}
+  topics:  {label:'Topics',    page:'topics'},
+  dict:    {label:'Dictionary', page:'dict'},
+  about:   {label:'About',     page:'about'},
+  contact: {label:'Contact',   page:'contact'}
 };
-let NAV_ORDER=[ {type:'fixed',key:'topics'}, {type:'fixed',key:'dict'}, {type:'fixed',key:'about'} ];
+let NAV_ORDER=[ {type:'fixed',key:'topics'}, {type:'fixed',key:'dict'}, {type:'fixed',key:'about'}, {type:'fixed',key:'contact'} ];
 let navManageMode=false;
 let activeCatOptFieldId=null; // which custom category's options page is currently shown, if any
 let DICT_CONTEXT=null; // {title, backLabel, backAction} when Dictionary was entered via a Topic/category-option card; null = plain "All signs" view, no Back button
@@ -2278,7 +2393,7 @@ window.renderHeaderNav=function(){
   if(mgBtn) mgBtn.innerHTML=navManageMode?'<i class="ti ti-check"></i> Done':'<i class="ti ti-arrows-move"></i> Manage nav';
 
   const currentActive = document.querySelector('.page.active')?.id;
-  const activePage = (currentActive==='pageTopics'||currentActive==='pageCategoryOptions') ? 'topics' : currentActive==='pageDict'?'dict' : currentActive==='pageAbout'?'about' : '';
+  const activePage = (currentActive==='pageTopics'||currentActive==='pageCategoryOptions') ? 'topics' : currentActive==='pageDict'?'dict' : currentActive==='pageAbout'?'about' : currentActive==='pageContact'?'contact' : '';
   const activeFieldId = currentActive==='pageCategoryOptions' ? activeCatOptFieldId : null;
 
   nav.innerHTML='';
@@ -3118,7 +3233,7 @@ window.confirmDelete=async function(){
 
 /* ══ ADMIN TABS ══ */
 window.switchAdminTab=async function(tab){
-  ['signs','options','handshapes','feedback','review','elan'].forEach(t=>{
+  ['signs','options','handshapes','feedback','review','contacts','elan'].forEach(t=>{
     const k=t.charAt(0).toUpperCase()+t.slice(1);
     document.getElementById('at'+k)?.classList.toggle('active',t===tab);
     document.getElementById('ap'+k)?.classList.toggle('active',t===tab);
@@ -3136,6 +3251,7 @@ window.switchAdminTab=async function(tab){
   if(tab==='handshapes') renderHsMgGrid();
   if(tab==='feedback')   renderFeedbackAdmin();
   if(tab==='review')     renderPendingReviewsAdmin();
+  if(tab==='contacts')   renderContactsAdmin();
 };
 
 /* ══ CATEGORIES & TAGS PANEL (per-document model) ══ */
@@ -3662,12 +3778,215 @@ window.showToast=function(msg){ const t=document.getElementById('toast'); t.text
 
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeFsModal(); closeEditModal(); closeDeleteModal(); hideEsNotice(); } });
 
+/* ══ CONTACT PAGE ══ */
+let CONTACT_CONTENT={
+  title:'Get in Touch',
+  body:'Have a question about SignBiz? Fill in the form below and we\'ll get back to you.'
+};
+let CONTACTS=[]; // cached for admin tab
+
+async function loadContactContent(){
+  try{
+    const snap=await getDoc(doc(db,'siteContent','contact'));
+    if(snap.exists()){
+      const d=snap.data();
+      if(d.title) CONTACT_CONTENT.title=d.title;
+      if(d.body)  CONTACT_CONTENT.body=d.body;
+    }
+  }catch(err){ console.error('loadContactContent failed:',err); }
+  renderContactView();
+}
+
+function renderContactView(){
+  const tEl=document.getElementById('contactTitleView');
+  const bEl=document.getElementById('contactBodyView');
+  if(tEl) tEl.textContent=CONTACT_CONTENT.title;
+  if(bEl) bEl.textContent=CONTACT_CONTENT.body;
+  const editBtn=document.getElementById('contactEditBtn');
+  if(editBtn) editBtn.style.display=isAdmin?'flex':'none';
+}
+
+window.enterContactEdit=function(){
+  document.getElementById('contactTitleInput').value=CONTACT_CONTENT.title;
+  document.getElementById('contactBodyInput').value=CONTACT_CONTENT.body;
+  document.getElementById('contactTitleView').style.display='none';
+  document.getElementById('contactBodyView').style.display='none';
+  document.getElementById('contactEditBtn').style.display='none';
+  document.getElementById('contactEditForm').style.display='block';
+};
+
+window.cancelContactEdit=function(){
+  document.getElementById('contactTitleView').style.display='';
+  document.getElementById('contactBodyView').style.display='';
+  document.getElementById('contactEditBtn').style.display=isAdmin?'flex':'none';
+  document.getElementById('contactEditForm').style.display='none';
+};
+
+window.saveContactContent=async function(){
+  const title=document.getElementById('contactTitleInput').value.trim()||'Get in Touch';
+  const body=document.getElementById('contactBodyInput').value.trim();
+  showSaving(true);
+  try{ await setDoc(doc(db,'siteContent','contact'),{title,body},{merge:true}); }
+  catch(err){ console.error('saveContactContent failed:',err); showToast('⚠ Could not save. Try again.'); showSaving(false); return; }
+  showSaving(false);
+  CONTACT_CONTENT.title=title; CONTACT_CONTENT.body=body;
+  renderContactView();
+  cancelContactEdit();
+  showToast('Contact page header updated');
+};
+
+window.onContactTypeChange=function(){
+  const type=document.querySelector('input[name="contactType"]:checked')?.value||'';
+  const orgField=document.getElementById('contactOrgField');
+  const researcherNotice=document.getElementById('contactResearcherNotice');
+  if(orgField) orgField.style.display=(type==='teacher'||type==='researcher')?'block':'none';
+  if(researcherNotice) researcherNotice.style.display=(type==='researcher')?'block':'none';
+  // Highlight selected type radio label
+  document.querySelectorAll('#contactTypeGroup label').forEach(lbl=>{
+    const inp=lbl.querySelector('input[type="radio"]');
+    const selected=inp && inp.checked;
+    lbl.style.borderColor=selected?'var(--accent)':'var(--border2)';
+    lbl.style.background=selected?'var(--accent-light)':'var(--bg2)';
+    lbl.style.color=selected?'var(--accent)':'var(--text)';
+  });
+};
+
+window.submitContactForm=async function(){
+  const type=document.querySelector('input[name="contactType"]:checked')?.value||'';
+  const name=document.getElementById('contactName').value.trim();
+  const email=document.getElementById('contactEmail').value.trim();
+  const message=document.getElementById('contactMessage').value.trim();
+  const org=document.getElementById('contactOrg').value.trim();
+  const errEl=document.getElementById('contactError');
+  const successEl=document.getElementById('contactSuccess');
+  const submitBtn=document.getElementById('contactSubmitBtn');
+  errEl.style.display='none';
+  successEl.style.display='none';
+
+  // Validate
+  if(!type){ errEl.textContent='Please select a type of enquiry.'; errEl.style.display='block'; return; }
+  if(!name){ errEl.textContent='Please enter your name.'; errEl.style.display='block'; return; }
+  if(!email||!email.includes('@')){ errEl.textContent='Please enter a valid email address.'; errEl.style.display='block'; return; }
+  if((type==='teacher'||type==='researcher')&&!org){ errEl.textContent='Please enter your organisation or institution.'; errEl.style.display='block'; return; }
+  if(!message){ errEl.textContent='Please enter a message.'; errEl.style.display='block'; return; }
+
+  submitBtn.disabled=true;
+  submitBtn.innerHTML='<i class="ti ti-loader"></i> Sending…';
+
+  try{
+    await addDoc(collection(db,'contacts'),{
+      type, name, email, message,
+      org: org||'',
+      ts: Date.now()
+    });
+    successEl.innerHTML=`<strong>Message sent!</strong> Thanks, ${esc(name)}. We'll get back to you at ${esc(email)} soon.`;
+    successEl.style.display='block';
+    // Reset form
+    document.querySelectorAll('input[name="contactType"]').forEach(r=>r.checked=false);
+    document.getElementById('contactName').value='';
+    document.getElementById('contactEmail').value='';
+    document.getElementById('contactOrg').value='';
+    document.getElementById('contactMessage').value='';
+    document.getElementById('contactOrgField').style.display='none';
+    document.getElementById('contactResearcherNotice').style.display='none';
+    onContactTypeChange();
+  }catch(err){
+    console.error('submitContactForm failed:',err);
+    errEl.textContent='⚠ Could not send. Please try again.';
+    errEl.style.display='block';
+  }finally{
+    submitBtn.disabled=false;
+    submitBtn.innerHTML='<i class="ti ti-send"></i> Send message';
+  }
+};
+
+/* ── Admin Contacts tab ── */
+async function loadContacts(){
+  try{
+    const snap=await getDocs(query(collection(db,'contacts'), orderBy('ts','desc')));
+    CONTACTS=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(err){ console.error('loadContacts failed:',err); CONTACTS=[]; }
+}
+
+const CONTACT_TYPE_LABELS={
+  general:'💬 General',
+  student:'🎓 HS Student',
+  teacher:'🏫 Teacher',
+  researcher:'🔬 Researcher'
+};
+
+window.renderContactsAdmin=async function(){
+  const el=document.getElementById('contactAdminList');
+  if(el) el.innerHTML='<p style="color:var(--text3);font-size:13px;">Loading…</p>';
+  await loadContacts();
+  if(!el) return;
+  if(!CONTACTS.length){ el.innerHTML='<p style="color:var(--text3);font-size:13px;">No messages yet.</p>'; return; }
+  el.innerHTML=CONTACTS.map(c=>{
+    const date=c.ts?new Date(c.ts).toLocaleString():'';
+    const typeLabel=CONTACT_TYPE_LABELS[c.type]||c.type||'—';
+    const typePill=`<span class="fb-badge" style="background:${c.type==='researcher'?'#ede9fe':c.type==='teacher'?'var(--success-light)':c.type==='student'?'var(--accent-light)':'var(--bg2)'};color:${c.type==='researcher'?'#7c3aed':c.type==='teacher'?'var(--success)':c.type==='student'?'var(--accent)':'var(--text2)'};">${esc(typeLabel)}</span>`;
+    const preview=c.message?(c.message.length>80?c.message.slice(0,80)+'…':c.message):'';
+    return `<div class="fb-card">
+      <div class="fb-card-header">
+        <span style="font-size:12px;font-weight:600;">${esc(c.name||'—')}</span>
+        ${typePill}
+        <span class="fb-sign-ref">${esc(c.email||'')}</span>
+        ${c.org?`<span class="fb-sign-ref">${esc(c.org)}</span>`:''}
+      </div>
+      ${preview?`<p class="fb-card-text" style="color:var(--text2);">${esc(preview)}</p>`:''}
+      <div class="row-actions" style="margin-top:8px;">
+        <button class="row-btn" onclick="openContactDetail('${esc(c.id)}')"><i class="ti ti-eye"></i> View</button>
+        <button class="row-btn del" onclick="deleteContactMsg('${esc(c.id)}')"><i class="ti ti-trash"></i> Delete</button>
+      </div>
+      <p class="fb-card-meta">${date}</p>
+    </div>`;
+  }).join('');
+};
+
+window.openContactDetail=function(id){
+  const c=CONTACTS.find(x=>x.id===id); if(!c) return;
+  const date=c.ts?new Date(c.ts).toLocaleString():'';
+  const typeLabel=CONTACT_TYPE_LABELS[c.type]||c.type||'—';
+  document.getElementById('contactDetailTitle').textContent=`${typeLabel} — ${c.name||''}`;
+  document.getElementById('contactDetailBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div><span style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);">From</span><p style="font-weight:500;">${esc(c.name||'—')}</p></div>
+      <div><span style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);">Email</span><p>${esc(c.email||'—')}</p></div>
+      ${c.org?`<div><span style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);">Organisation</span><p>${esc(c.org)}</p></div>`:''}
+      <div><span style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);">Message</span><p style="white-space:pre-wrap;line-height:1.7;">${esc(c.message||'—')}</p></div>
+      <p style="font-size:11px;color:var(--text3);">${date}</p>
+    </div>`;
+  const replyBtn=document.getElementById('contactReplyBtn');
+  if(replyBtn && c.email){
+    const subject=encodeURIComponent(`Re: SignBiz enquiry (${typeLabel})`);
+    const body=encodeURIComponent(`Hi ${c.name||''},\n\nThank you for reaching out.\n\n`);
+    replyBtn.onclick=()=>{ window.open(`mailto:${c.email}?subject=${subject}&body=${body}`); };
+    replyBtn.style.display='flex';
+  } else if(replyBtn){ replyBtn.style.display='none'; }
+  document.getElementById('contactDetailModal').classList.add('show');
+};
+
+window.closeContactDetailModal=function(){
+  document.getElementById('contactDetailModal').classList.remove('show');
+};
+
+window.deleteContactMsg=async function(id){
+  if(!confirm('Delete this message? This cannot be undone.')) return;
+  try{
+    await deleteDoc(doc(db,'contacts',id));
+    CONTACTS=CONTACTS.filter(c=>c.id!==id);
+    showToast('Message deleted');
+    renderContactsAdmin();
+  }catch(err){ console.error(err); showToast('⚠ Could not delete.'); }
+};
+
 /* ══ INIT ══ */
 async function init(){
   dataLoadedPromise = loadAll();
   try{ await dataLoadedPromise; }
   catch(e){ console.error(e); showToast('⚠ Firebase connection error. Check your config and Firestore rules.'); }
   await loadAboutContent();
+  await loadContactContent();
   await loadTopicsHeroContent();
   await loadNavOrder();
   renderHeaderNav();
