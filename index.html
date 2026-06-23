@@ -2359,7 +2359,16 @@ async function loadNavOrder(){
   try{
     const snap=await getDoc(doc(db,'siteContent','navOrder'));
     if(snap.exists() && Array.isArray(snap.data().items) && snap.data().items.length){
-      NAV_ORDER=snap.data().items;
+      const saved=snap.data().items;
+      // Ensure every fixed key (including newly added ones like 'contact') is
+      // present even if the saved navOrder pre-dates it. New keys are appended
+      // at the end so existing ordering is preserved.
+      const savedKeys=new Set(saved.filter(e=>e.type==='fixed').map(e=>e.key));
+      const merged=[...saved];
+      Object.keys(NAV_FIXED_DEFS).forEach(key=>{
+        if(!savedKeys.has(key)) merged.push({type:'fixed',key});
+      });
+      NAV_ORDER=merged;
     }
   }catch(err){ console.error('loadNavOrder failed:',err); }
 }
