@@ -309,6 +309,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .fb-card-header{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
 .fb-stars{color:#F59E0B;font-size:12px;letter-spacing:1px;}
 .fb-badge{font-size:10px;padding:2px 8px;border-radius:20px;background:var(--accent-light);color:var(--accent);}
+.unread-dot{width:7px;height:7px;border-radius:50%;background:var(--vexample);flex-shrink:0;}
 .fb-sign-ref{font-size:11px;color:var(--text3);}
 .fb-card-text{font-size:13px;color:var(--text2);line-height:1.6;}
 .fb-card-meta{font-size:11px;color:var(--text3);margin-top:6px;}
@@ -667,9 +668,9 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     <div class="admin-tab active" id="atSigns" onclick="switchAdminTab('signs')">Signs</div>
     <div class="admin-tab" id="atOptions" onclick="switchAdminTab('options')">Categories &amp; Tags</div>
     <div class="admin-tab" id="atHandshapes" onclick="switchAdminTab('handshapes')">Handshape Images</div>
-    <div class="admin-tab" id="atFeedback" onclick="switchAdminTab('feedback')">Feedback</div>
+    <div class="admin-tab" id="atFeedback" onclick="switchAdminTab('feedback')">Feedback <span id="feedbackCountBadge" class="fb-badge" style="display:none;background:var(--vexample-light);color:var(--vexample);margin-left:4px;">0</span></div>
     <div class="admin-tab" id="atReview" style="display:none;" onclick="switchAdminTab('review')">Pending Review <span id="reviewCountBadge" class="fb-badge" style="display:none;background:var(--vexample-light);color:var(--vexample);margin-left:4px;">0</span></div>
-    <div class="admin-tab" id="atContacts" onclick="switchAdminTab('contacts')">Contacts</div>
+    <div class="admin-tab" id="atContacts" onclick="switchAdminTab('contacts')">Contacts <span id="contactsCountBadge" class="fb-badge" style="display:none;background:var(--vexample-light);color:var(--vexample);margin-left:4px;">0</span></div>
     <div class="admin-tab" id="atElan" onclick="switchAdminTab('elan')">ELAN Data</div>
   </div>
 
@@ -1010,6 +1011,12 @@ let isAdmin=false; // determined by checking admins/{email} collection after log
 let isMainAdmin=false; // true only if admins/{email}.role === 'main'
 let isResearcher=false; // true if admins/{email}.role === 'researcher' (read-only, no admin panel)
 let adminName=''; // display name from admins/{email}.name, falls back to email
+// Per-admin "read state" for the Feedback/Contacts unread badges — lives on
+// the admin's own admins/{email} doc (see firestore.rules: onlySelfReadStateFields).
+// "Read" = either arrived before lastSeen*Ts (tab was opened after it came in)
+// OR its id is in the personal ignore list — either one silences it for THIS
+// admin only; it never affects what other admins see.
+let adminReadState={lastSeenFeedbackTs:0, lastSeenContactsTs:0, ignoredFeedbackIds:[], ignoredContactIds:[]};
 
 // Escapes any string before it goes into an innerHTML template literal. Every value that
 // ultimately comes from Firestore (sign names, category/tag values, feedback text, nicknames,
@@ -1349,6 +1356,83 @@ async function refreshReviewBadge(){
   if(PENDING_REVIEWS.length){ badge.textContent=PENDING_REVIEWS.length; badge.style.display='inline'; }
   else { badge.style.display='none'; }
 }
+
+/* ══ FEEDBACK / CONTACTS UNREAD BADGES (per-admin read state) ══
+   An item counts as unread for THIS admin if it arrived after their
+   lastSeen*Ts AND its id isn't in their personal ignore list — either
+   condition (auto-seen-by-opening-the-tab, or manual ignore) silences it.
+   Read state lives on admins/{email} (see adminReadState + firestore.rules);
+   it never affects what other admins see. ══ */
+function unreadFeedbackCount(){
+  return FEEDBACKS.filter(f=>
+    (f.ts||0) > adminReadState.lastSeenFeedbackTs &&
+    !adminReadState.ignoredFeedbackIds.includes(f.id)
+  ).length;
+}
+function unreadContactsCount(){
+  return CONTACTS.filter(c=>
+    (c.ts||0) > adminReadState.lastSeenContactsTs &&
+    !adminReadState.ignoredContactIds.includes(c.id)
+  ).length;
+}
+function paintCountBadge(elId, count){
+  const badge=document.getElementById(elId);
+  if(!badge) return;
+  if(count>0){ badge.textContent=count; badge.style.display='inline'; }
+  else { badge.style.display='none'; }
+}
+// Loads feedback/contacts fresh if we don't have them cached yet, then
+// paints the tab badge. Safe to call any time an admin is signed in —
+// doesn't require the tab to be open.
+async function refreshFeedbackBadge(){
+  if(!isAdmin) return;
+  if(!FEEDBACKS.length) await loadFeedback();
+  paintCountBadge('feedbackCountBadge', unreadFeedbackCount());
+}
+async function refreshContactsBadge(){
+  if(!isAdmin) return;
+  if(!CONTACTS.length) await loadContacts();
+  paintCountBadge('contactsCountBadge', unreadContactsCount());
+}
+// Persists ONE read-state field to the admin's own admins/{email} doc.
+// Firestore rules only allow an admin to touch their own doc, and only
+// these four fields (onlySelfReadStateFields) — role/name are untouchable.
+async function saveReadStateField(field, value){
+  adminReadState[field]=value;
+  if(!currentUser?.email) return;
+  try{ await setDoc(doc(db,'admins',currentUser.email), {[field]:value}, {merge:true}); }
+  catch(err){ console.error('saveReadStateField failed:',err); }
+}
+// Called when the Feedback/Contacts tab is opened: everything currently in
+// the list becomes "seen" (lastSeenTs = now). Items that arrive AFTER this
+// point will show up as unread again next time.
+window.markFeedbackSeen=async function(){
+  await saveReadStateField('lastSeenFeedbackTs', Date.now());
+  paintCountBadge('feedbackCountBadge', unreadFeedbackCount());
+};
+window.markContactsSeen=async function(){
+  await saveReadStateField('lastSeenContactsTs', Date.now());
+  paintCountBadge('contactsCountBadge', unreadContactsCount());
+};
+// Per-item manual "ignore" — lets an admin silence one item without waiting
+// to open the whole tab (or to keep tracking it in the list while no longer
+// nagging the badge). Personal only; toggleable.
+window.toggleIgnoreFeedback=async function(id){
+  const list=adminReadState.ignoredFeedbackIds.slice();
+  const i=list.indexOf(id);
+  if(i===-1) list.push(id); else list.splice(i,1);
+  await saveReadStateField('ignoredFeedbackIds', list);
+  paintCountBadge('feedbackCountBadge', unreadFeedbackCount());
+  renderFeedbackAdmin();
+};
+window.toggleIgnoreContact=async function(id){
+  const list=adminReadState.ignoredContactIds.slice();
+  const i=list.indexOf(id);
+  if(i===-1) list.push(id); else list.splice(i,1);
+  await saveReadStateField('ignoredContactIds', list);
+  paintCountBadge('contactsCountBadge', unreadContactsCount());
+  renderContactsAdmin();
+};
 
 // Renders a readable summary of what changed for an "edit" review:
 // only the fields that actually differ between before/after.
@@ -1699,6 +1783,12 @@ onAuthStateChanged(auth, async user=>{
   isMainAdmin = !!adminData && adminData.role==='main';
   isResearcher = !!adminData && adminData.role==='researcher';
   adminName = adminData?.name || user?.displayName || user?.email || '';
+  adminReadState = {
+    lastSeenFeedbackTs: adminData?.lastSeenFeedbackTs || 0,
+    lastSeenContactsTs: adminData?.lastSeenContactsTs || 0,
+    ignoredFeedbackIds: adminData?.ignoredFeedbackIds || [],
+    ignoredContactIds: adminData?.ignoredContactIds || []
+  };
   await loadUserPrefs();
   const uEl=document.getElementById('headerUser'), aBtn=document.getElementById('adminNavBtn'),
         lBtn=document.getElementById('loginNavBtn'), oBtn=document.getElementById('logoutBtn');
@@ -1724,6 +1814,7 @@ onAuthStateChanged(auth, async user=>{
   renderAboutView();
   renderContactView();
   if(isMainAdmin) refreshReviewBadge();
+  if(isAdmin){ refreshFeedbackBadge(); refreshContactsBadge(); }
 });
 
 /* ══ PAGE ROUTING ══ */
@@ -1808,6 +1899,7 @@ window.showPage=function(p,extra){
     const reviewTab=document.getElementById('atReview');
     if(reviewTab){ reviewTab.style.display=isMainAdmin?'flex':'none'; }
     if(isMainAdmin) refreshReviewBadge();
+    if(isAdmin){ refreshFeedbackBadge(); refreshContactsBadge(); }
   }
   else if(p==='about'){ document.getElementById('pageAbout').classList.add('active'); document.querySelectorAll('.nav-item[data-page="about"]').forEach(el=>el.classList.add('active')); }
   else if(p==='contact'){ document.getElementById('pageContact').classList.add('active'); document.querySelectorAll('.nav-item[data-page="contact"]').forEach(el=>el.classList.add('active')); renderContactView(); }
@@ -3258,9 +3350,9 @@ window.switchAdminTab=async function(tab){
   if(dataLoadedPromise) await dataLoadedPromise;
   if(tab==='options')    renderOptionsPanel();
   if(tab==='handshapes') renderHsMgGrid();
-  if(tab==='feedback')   renderFeedbackAdmin();
+  if(tab==='feedback')  { renderFeedbackAdmin().then(markFeedbackSeen); }
   if(tab==='review')     renderPendingReviewsAdmin();
-  if(tab==='contacts')   renderContactsAdmin();
+  if(tab==='contacts')  { renderContactsAdmin().then(markContactsSeen); }
 };
 
 /* ══ CATEGORIES & TAGS PANEL (per-document model) ══ */
@@ -3752,12 +3844,20 @@ window.renderFeedbackAdmin=async function(){
     const name=f.displayName||'Anonymous';
     const pubBadge=f.text ? (f.isPublic?`<span class="fb-badge" style="background:var(--success-light);color:var(--success);">Public</span>`:`<span class="fb-badge">Private</span>`) : '';
     const reply=f.teamReply?`<div class="fb-team-reply"><div class="fb-team-reply-header"><i class="ti ti-shield-check" style="margin-right:3px;"></i>Response from the team</div><div class="fb-team-reply-text">${esc(f.teamReply)}</div></div>`:'';
-    return `<div class="fb-card">
+    const isIgnored=adminReadState.ignoredFeedbackIds.includes(f.id);
+    const isUnread=(f.ts||0)>adminReadState.lastSeenFeedbackTs && !isIgnored;
+    const unreadDot=isUnread?`<span class="unread-dot" title="New since you last checked"></span>`:'';
+    const ignoreBtn=isIgnored
+      ? `<button class="row-btn" onclick="toggleIgnoreFeedback('${f.id}')"><i class="ti ti-rotate"></i> Un-ignore</button>`
+      : `<button class="row-btn" onclick="toggleIgnoreFeedback('${f.id}')"><i class="ti ti-eye-off"></i> Ignore</button>`;
+    return `<div class="fb-card" style="${isUnread?'border-left:3px solid var(--vexample);':''}">
       <div class="fb-card-header">
+        ${unreadDot}
         <span style="font-size:12px;font-weight:600;">${esc(name)}</span>
         ${stars?`<span class="fb-stars">${stars}</span>`:''}
         <span class="fb-badge">${esc(f.type||'Other')}</span>
         ${pubBadge}
+        ${isIgnored?`<span class="fb-badge" style="background:var(--bg2);color:var(--text3);">Ignored</span>`:''}
         ${f.signName?`<span class="fb-sign-ref">Re: ${esc(f.signName)}</span>`:'<span class="fb-sign-ref">General</span>'}
         <button class="fb-del-btn" onclick="deleteFeedback('${f.id}','${f.signId||''}')"><i class="ti ti-trash"></i></button>
       </div>
@@ -3768,6 +3868,7 @@ window.renderFeedbackAdmin=async function(){
           ? `<button class="row-btn" onclick="toggleFeedbackPublic('${f.signId}','${f.id}',false).then(renderFeedbackAdmin)"><i class="ti ti-eye-off"></i> Hide</button>`
           : `<button class="row-btn" onclick="toggleFeedbackPublic('${f.signId}','${f.id}',true).then(renderFeedbackAdmin)"><i class="ti ti-eye"></i> Make public</button>`) : ''}
         ${f.text ? `<button class="row-btn" onclick="openTeamReplyPrompt('${f.signId}','${f.id}').then(renderFeedbackAdmin)"><i class="ti ti-message-reply"></i> ${f.teamReply?'Edit reply':'Reply'}</button>` : ''}
+        ${ignoreBtn}
       </div>
       <p class="fb-card-meta">${date}</p>
     </div>`;
@@ -3776,8 +3877,10 @@ window.renderFeedbackAdmin=async function(){
 window.deleteFeedback=async function(id,signId){
   await deleteDoc(doc(db,'feedbackComments',id));
   showToast('Feedback deleted');
+  FEEDBACKS=FEEDBACKS.filter(f=>f.id!==id);
   if(signId && feedbackBySign[signId]) feedbackBySign[signId]=feedbackBySign[signId].filter(f=>f.id!==id);
   if(document.getElementById('pageAdmin').classList.contains('active')) renderFeedbackAdmin();
+  paintCountBadge('feedbackCountBadge', unreadFeedbackCount());
   if(activeWord){ const w=WORDS.find(x=>x.id===activeWord); if(w) renderDetail(w); }
 };
 
@@ -3913,7 +4016,10 @@ window.submitContactForm=async function(){
 async function loadContacts(){
   try{
     const snap=await getDocs(query(collection(db,'contacts'), orderBy('ts','desc')));
-    CONTACTS=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Same convention as loadCollection(): a staff-submitted delete soft-hides
+    // the doc (_hidden:true) pending Main Admin review — it disappears from
+    // this list for everyone and only shows up in the Pending Review tab.
+    CONTACTS=snap.docs.map(d=>({id:d.id,...d.data()})).filter(d=>!d._hidden);
   }catch(err){ console.error('loadContacts failed:',err); CONTACTS=[]; }
 }
 
@@ -3935,10 +4041,18 @@ window.renderContactsAdmin=async function(){
     const typeLabel=CONTACT_TYPE_LABELS[c.type]||c.type||'—';
     const typePill=`<span class="fb-badge" style="background:${c.type==='researcher'?'#ede9fe':c.type==='teacher'?'var(--success-light)':c.type==='student'?'var(--accent-light)':'var(--bg2)'};color:${c.type==='researcher'?'#7c3aed':c.type==='teacher'?'var(--success)':c.type==='student'?'var(--accent)':'var(--text2)'};">${esc(typeLabel)}</span>`;
     const preview=c.message?(c.message.length>80?c.message.slice(0,80)+'…':c.message):'';
-    return `<div class="fb-card">
+    const isIgnored=adminReadState.ignoredContactIds.includes(c.id);
+    const isUnread=(c.ts||0)>adminReadState.lastSeenContactsTs && !isIgnored;
+    const unreadDot=isUnread?`<span class="unread-dot" title="New since you last checked"></span>`:'';
+    const ignoreBtn=isIgnored
+      ? `<button class="row-btn" onclick="toggleIgnoreContact('${esc(c.id)}')"><i class="ti ti-rotate"></i> Un-ignore</button>`
+      : `<button class="row-btn" onclick="toggleIgnoreContact('${esc(c.id)}')"><i class="ti ti-eye-off"></i> Ignore</button>`;
+    return `<div class="fb-card" style="${isUnread?'border-left:3px solid var(--vexample);':''}">
       <div class="fb-card-header">
+        ${unreadDot}
         <span style="font-size:12px;font-weight:600;">${esc(c.name||'—')}</span>
         ${typePill}
+        ${isIgnored?`<span class="fb-badge" style="background:var(--bg2);color:var(--text3);">Ignored</span>`:''}
         <span class="fb-sign-ref">${esc(c.email||'')}</span>
         ${c.org?`<span class="fb-sign-ref">${esc(c.org)}</span>`:''}
       </div>
@@ -3946,6 +4060,7 @@ window.renderContactsAdmin=async function(){
       <div class="row-actions" style="margin-top:8px;">
         <button class="row-btn" onclick="openContactDetail('${esc(c.id)}')"><i class="ti ti-eye"></i> View</button>
         <button class="row-btn del" onclick="deleteContactMsg('${esc(c.id)}')"><i class="ti ti-trash"></i> Delete</button>
+        ${ignoreBtn}
       </div>
       <p class="fb-card-meta">${date}</p>
     </div>`;
@@ -3980,13 +4095,26 @@ window.closeContactDetailModal=function(){
 };
 
 window.deleteContactMsg=async function(id){
-  if(!confirm('Delete this message? This cannot be undone.')) return;
+  const c=CONTACTS.find(x=>x.id===id);
+  if(!c){ showToast('⚠ Message not found.'); return; }
+  const confirmMsg=isMainAdmin
+    ? 'Delete this message? This cannot be undone.'
+    : 'Submit this message for deletion? It will be hidden and sent to Main Admin for final approval.';
+  if(!confirm(confirmMsg)) return;
+  showSaving(true);
   try{
-    await deleteDoc(doc(db,'contacts',id));
-    CONTACTS=CONTACTS.filter(c=>c.id!==id);
-    showToast('Message deleted');
+    if(isMainAdmin){
+      await deleteDoc(doc(db,'contacts',id));
+      showToast('Message deleted');
+    } else {
+      await submitDeleteWithReview('contacts', id, c.name||c.email||id, c);
+      showToast('Submitted for Main Admin review');
+    }
+    CONTACTS=CONTACTS.filter(x=>x.id!==id);
+    paintCountBadge('contactsCountBadge', unreadContactsCount());
     renderContactsAdmin();
   }catch(err){ console.error(err); showToast('⚠ Could not delete.'); }
+  finally{ showSaving(false); }
 };
 
 /* ══ INIT ══ */
