@@ -501,10 +501,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 
   /* ── About page ── */
   #pageAbout > div{margin:16px auto;padding:20px 18px;width:calc(100% - 32px);}
-  /* ── Contact page ── */
-  #pageContact > div{margin:16px auto;padding:0 8px;width:100%;}
-  #pageContact .form-grid{grid-template-columns:1fr;}
-  #contactTypeGrid{grid-template-columns:1fr;}
 }
 
 /* Admin & login pages are excluded from the mobile layout above —
@@ -674,7 +670,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     <div class="admin-tab" id="atFeedback" onclick="switchAdminTab('feedback')">Feedback</div>
     <div class="admin-tab" id="atReview" style="display:none;" onclick="switchAdminTab('review')">Pending Review <span id="reviewCountBadge" class="fb-badge" style="display:none;background:var(--vexample-light);color:var(--vexample);margin-left:4px;">0</span></div>
     <div class="admin-tab" id="atElan" onclick="switchAdminTab('elan')">ELAN Data</div>
-    <div class="admin-tab" id="atContacts" onclick="switchAdminTab('contacts')">Contacts</div>
   </div>
 
   <div class="admin-tab-panel active" id="apSigns">
@@ -751,26 +746,9 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
       <div id="elanUploadResult" style="display:none;margin-top:14px;padding:10px 14px;border-radius:var(--r-md);font-size:13px;"></div>
     </div>
   </div>
-
-  <div class="admin-tab-panel" id="apContacts">
-    <div class="fb-admin-wrap">
-      <div class="fb-admin-filters" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <select id="contactFilterType" onchange="renderContactsAdmin()">
-          <option value="">All types</option>
-          <option value="student">HS Student</option>
-          <option value="teacher">Teacher</option>
-          <option value="general">General</option>
-          <option value="researcher">Researcher</option>
-        </select>
-        <button class="btn" onclick="loadAndRenderContacts()"><i class="ti ti-refresh"></i> Refresh</button>
-        <span id="contactsCount" style="font-size:12px;color:var(--text3);margin-left:4px;"></span>
-      </div>
-      <div id="contactsTableWrap" style="margin-top:14px;">
-        <p style="font-size:12px;color:var(--text3);">Loading…</p>
-      </div>
-    </div>
-  </div>
 </div>
+
+<div class="page" id="pageAbout">
   <div style="max-width:600px;margin:40px auto;background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
       <h2 id="aboutTitleView" style="font-size:20px;font-weight:500;margin-bottom:8px;">About SignBiz</h2>
@@ -788,82 +766,6 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     </div>
 
     <button class="btn" style="margin-top:16px;" onclick="showPage('dict')"><i class="ti ti-arrow-left"></i> Back to dictionary</button>
-  </div>
-</div>
-
-<div class="page" id="pageContact">
-  <div style="max-width:680px;margin:40px auto;padding:0 16px;">
-    <div style="background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;margin-bottom:20px;">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-        <h2 id="contactTitleView" style="font-size:20px;font-weight:500;margin-bottom:6px;">Contact Us</h2>
-        <button class="row-btn" id="contactEditBtn" style="display:none;flex-shrink:0;" onclick="enterContactEdit()"><i class="ti ti-edit"></i> Edit</button>
-      </div>
-      <div id="contactBodyView" style="color:var(--text2);line-height:1.7;white-space:pre-wrap;margin-bottom:4px;">Have a question or feedback? Use the form below to get in touch with our team.</div>
-      <div id="contactEditForm" style="display:none;margin-top:12px;">
-        <div class="form-field"><label>Page title</label><input type="text" id="contactTitleInput"/></div>
-        <div class="form-field"><label>Introduction text</label><textarea id="contactBodyInput" style="min-height:100px;"></textarea></div>
-        <div class="form-footer" style="margin-top:6px;">
-          <button class="btn" onclick="cancelContactEdit()">Cancel</button>
-          <button class="btn btn-primary" onclick="saveContactContent()">Save</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Contact form card -->
-    <div style="background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;">
-      <p style="font-size:13px;font-weight:600;margin-bottom:18px;color:var(--text);">Send us a message</p>
-
-      <!-- Enquiry type selector -->
-      <div class="form-field" style="margin-bottom:16px;">
-        <label style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:6px;display:block;">Type of enquiry *</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="contactTypeGrid">
-          <label id="ctype-student" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:0.5px solid var(--border);border-radius:var(--r-md);cursor:pointer;font-size:12px;color:var(--text2);transition:border-color 0.15s,background 0.15s;">
-            <input type="radio" name="contactType" value="student" style="width:auto;height:auto;margin:0;" onchange="onContactTypeChange()"/>
-            <i class="ti ti-school" style="font-size:15px;" aria-hidden="true"></i> HS student question
-          </label>
-          <label id="ctype-teacher" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:0.5px solid var(--border);border-radius:var(--r-md);cursor:pointer;font-size:12px;color:var(--text2);transition:border-color 0.15s,background 0.15s;">
-            <input type="radio" name="contactType" value="teacher" style="width:auto;height:auto;margin:0;" onchange="onContactTypeChange()"/>
-            <i class="ti ti-chalkboard" style="font-size:15px;" aria-hidden="true"></i> Teacher / educator
-          </label>
-          <label id="ctype-general" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:0.5px solid var(--border);border-radius:var(--r-md);cursor:pointer;font-size:12px;color:var(--text2);transition:border-color 0.15s,background 0.15s;">
-            <input type="radio" name="contactType" value="general" style="width:auto;height:auto;margin:0;" onchange="onContactTypeChange()"/>
-            <i class="ti ti-message-circle" style="font-size:15px;" aria-hidden="true"></i> General question
-          </label>
-          <label id="ctype-researcher" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:0.5px solid var(--border);border-radius:var(--r-md);cursor:pointer;font-size:12px;color:var(--text2);transition:border-color 0.15s,background 0.15s;">
-            <input type="radio" name="contactType" value="researcher" style="width:auto;height:auto;margin:0;" onchange="onContactTypeChange()"/>
-            <i class="ti ti-microscope" style="font-size:15px;" aria-hidden="true"></i> Researcher access request
-          </label>
-        </div>
-      </div>
-
-      <!-- Researcher notice (shown only when researcher is selected) -->
-      <div id="contactResearcherNotice" style="display:none;background:#faf5ff;border:0.5px solid #c4b5fd;border-radius:var(--r-md);padding:12px 14px;font-size:12px;color:#7c3aed;line-height:1.6;margin-bottom:16px;">
-        <i class="ti ti-info-circle" style="font-size:14px;margin-right:4px;" aria-hidden="true"></i>
-        Requesting researcher access? Please include your institution, research topic, and how you intend to use the sign data. Your account will be reviewed before access is granted.
-      </div>
-
-      <div class="form-grid">
-        <div class="form-field"><label>First name *</label><input type="text" id="cfFirstName" placeholder="e.g. Alex"/></div>
-        <div class="form-field"><label>Last name *</label><input type="text" id="cfLastName" placeholder="e.g. Smith"/></div>
-      </div>
-      <div class="form-field"><label>Email address *</label><input type="text" id="cfEmail" placeholder="you@example.com"/></div>
-      <div class="form-field" id="cfOrganisationWrap" style="display:none;">
-        <label id="cfOrganisationLabel">Organisation / institution</label>
-        <input type="text" id="cfOrganisation" placeholder="e.g. University of Auckland"/>
-      </div>
-      <div class="form-field"><label>Message *</label><textarea id="cfMessage" style="min-height:130px;" placeholder="Tell us how we can help…"></textarea></div>
-      <div id="contactFormError" style="display:none;font-size:12px;color:var(--danger);margin-bottom:10px;"></div>
-      <div id="contactFormSuccess" style="display:none;background:var(--success-light);border:0.5px solid var(--success);border-radius:var(--r-md);padding:12px 14px;font-size:13px;color:var(--success);margin-bottom:10px;">
-        <i class="ti ti-circle-check" style="margin-right:5px;" aria-hidden="true"></i> Your message has been sent. We'll be in touch soon.
-      </div>
-      <div class="form-footer" style="justify-content:flex-end;">
-        <button class="btn btn-primary" onclick="submitContactForm()"><i class="ti ti-send" style="margin-right:5px;" aria-hidden="true"></i> Send message</button>
-      </div>
-    </div>
-
-    <div style="margin-top:16px;">
-      <button class="btn" onclick="showPage('topics')"><i class="ti ti-arrow-left"></i> Back to Topics</button>
-    </div>
   </div>
 </div>
 
@@ -1612,203 +1514,6 @@ window.saveAboutContent=async function(){
   showToast('About page updated');
 };
 
-/* ══ CONTACT PAGE CONTENT (siteContent/contact) — admin-editable, public-readable ══ */
-let CONTACT_CONTENT={
-  title:'Contact Us',
-  body:'Have a question or feedback? Use the form below to get in touch with our team.'
-};
-
-async function loadContactContent(){
-  try{
-    const snap=await getDoc(doc(db,'siteContent','contact'));
-    if(snap.exists()){
-      const d=snap.data();
-      if(d.title) CONTACT_CONTENT.title=d.title;
-      if(d.body)  CONTACT_CONTENT.body=d.body;
-    }
-  }catch(err){ console.error('loadContactContent failed:',err); }
-  renderContactView();
-}
-
-function renderContactView(){
-  const tEl=document.getElementById('contactTitleView');
-  const bEl=document.getElementById('contactBodyView');
-  if(tEl) tEl.textContent=CONTACT_CONTENT.title;
-  if(bEl) bEl.textContent=CONTACT_CONTENT.body;
-  const editBtn=document.getElementById('contactEditBtn');
-  if(editBtn) editBtn.style.display=isAdmin?'flex':'none';
-}
-
-window.enterContactEdit=function(){
-  document.getElementById('contactTitleInput').value=CONTACT_CONTENT.title;
-  document.getElementById('contactBodyInput').value=CONTACT_CONTENT.body;
-  document.getElementById('contactTitleView').style.display='none';
-  document.getElementById('contactBodyView').style.display='none';
-  document.getElementById('contactEditBtn').style.display='none';
-  document.getElementById('contactEditForm').style.display='block';
-};
-
-window.cancelContactEdit=function(){
-  document.getElementById('contactTitleView').style.display='';
-  document.getElementById('contactBodyView').style.display='';
-  document.getElementById('contactEditBtn').style.display=isAdmin?'flex':'none';
-  document.getElementById('contactEditForm').style.display='none';
-};
-
-window.saveContactContent=async function(){
-  const title=document.getElementById('contactTitleInput').value.trim()||'Contact Us';
-  const body=document.getElementById('contactBodyInput').value.trim();
-  showSaving(true);
-  try{ await setDoc(doc(db,'siteContent','contact'),{title,body},{merge:true}); }
-  catch(err){ console.error('saveContactContent failed:',err); showToast('⚠ Could not save. Try again.'); showSaving(false); return; }
-  showSaving(false);
-  CONTACT_CONTENT.title=title; CONTACT_CONTENT.body=body;
-  renderContactView();
-  cancelContactEdit();
-  showToast('Contact page updated');
-};
-
-window.onContactTypeChange=function(){
-  const val=document.querySelector('input[name="contactType"]:checked')?.value||'';
-  // Highlight selected tile
-  ['student','teacher','general','researcher'].forEach(t=>{
-    const lbl=document.getElementById('ctype-'+t);
-    if(!lbl) return;
-    if(t===val){
-      lbl.style.borderColor='var(--accent)';
-      lbl.style.background='var(--accent-light)';
-      lbl.style.color='var(--accent)';
-    } else {
-      lbl.style.borderColor='var(--border)';
-      lbl.style.background='';
-      lbl.style.color='var(--text2)';
-    }
-  });
-  // Show researcher notice
-  const notice=document.getElementById('contactResearcherNotice');
-  if(notice) notice.style.display=val==='researcher'?'block':'none';
-  // Show organisation field for teacher/researcher
-  const orgWrap=document.getElementById('cfOrganisationWrap');
-  const orgLbl=document.getElementById('cfOrganisationLabel');
-  if(orgWrap){
-    if(val==='teacher'||val==='researcher'){
-      orgWrap.style.display='';
-      if(orgLbl) orgLbl.textContent=val==='researcher'?'Institution *':'School / organisation';
-    } else {
-      orgWrap.style.display='none';
-    }
-  }
-};
-
-window.submitContactForm=async function(){
-  const errEl=document.getElementById('contactFormError');
-  const successEl=document.getElementById('contactFormSuccess');
-  errEl.style.display='none'; successEl.style.display='none';
-  const type=document.querySelector('input[name="contactType"]:checked')?.value||'';
-  const first=document.getElementById('cfFirstName').value.trim();
-  const last=document.getElementById('cfLastName').value.trim();
-  const email=document.getElementById('cfEmail').value.trim();
-  const msg=document.getElementById('cfMessage').value.trim();
-  if(!type){ errEl.textContent='Please select a type of enquiry.'; errEl.style.display='block'; return; }
-  if(!first||!last){ errEl.textContent='Please enter your first and last name.'; errEl.style.display='block'; return; }
-  if(!email||!email.includes('@')){ errEl.textContent='Please enter a valid email address.'; errEl.style.display='block'; return; }
-  if(!msg){ errEl.textContent='Please enter a message.'; errEl.style.display='block'; return; }
-  const btn=document.querySelector('#pageContact .btn-primary');
-  if(btn){ btn.disabled=true; btn.innerHTML='<i class="ti ti-loader" style="margin-right:5px;"></i> Sending…'; }
-  try{
-    await addDoc(collection(db,'contacts'),{
-      type, firstName:first, lastName:last, email,
-      organisation:document.getElementById('cfOrganisation').value.trim()||'',
-      message:msg, ts:Date.now()
-    });
-    successEl.style.display='block';
-    document.getElementById('cfFirstName').value='';
-    document.getElementById('cfLastName').value='';
-    document.getElementById('cfEmail').value='';
-    document.getElementById('cfOrganisation').value='';
-    document.getElementById('cfMessage').value='';
-    document.querySelectorAll('input[name="contactType"]').forEach(r=>r.checked=false);
-    onContactTypeChange();
-  }catch(err){
-    console.error('submitContactForm failed:',err);
-    errEl.textContent='Could not send. Please try again.'; errEl.style.display='block';
-  }finally{
-    if(btn){ btn.disabled=false; btn.innerHTML='<i class="ti ti-send" style="margin-right:5px;"></i> Send message'; }
-  }
-};
-
-/* ══ CONTACTS ADMIN TAB ══ */
-let CONTACTS_DATA=[];
-const CONTACT_TYPE_LABELS={student:'HS Student',teacher:'Teacher',general:'General',researcher:'Researcher'};
-
-window.loadAndRenderContacts=async function(){
-  const wrap=document.getElementById('contactsTableWrap');
-  if(wrap) wrap.innerHTML='<p style="font-size:12px;color:var(--text3);">Loading…</p>';
-  try{
-    const snap=await getDocs(query(collection(db,'contacts'),orderBy('ts','desc')));
-    CONTACTS_DATA=snap.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(err){ console.error('loadContacts failed:',err); CONTACTS_DATA=[]; }
-  renderContactsAdmin();
-};
-
-window.renderContactsAdmin=function(){
-  const wrap=document.getElementById('contactsTableWrap'); if(!wrap) return;
-  const typeFilter=document.getElementById('contactFilterType')?.value||'';
-  const rows=CONTACTS_DATA.filter(c=>!typeFilter||c.type===typeFilter);
-  document.getElementById('contactsCount').textContent=`${rows.length} message${rows.length===1?'':'s'}`;
-  if(!rows.length){ wrap.innerHTML='<p style="font-size:12px;color:var(--text3);padding:8px 0;">No messages found.</p>'; return; }
-  wrap.innerHTML=`
-    <table class="admin-table">
-      <thead><tr><th>Date</th><th>Type</th><th>Name</th><th>Email</th><th>Message</th><th>Action</th></tr></thead>
-      <tbody>${rows.map(c=>{
-        const date=new Date(c.ts||0).toLocaleDateString('en-NZ',{day:'numeric',month:'short',year:'numeric'});
-        const typeLabel=CONTACT_TYPE_LABELS[c.type]||c.type||'—';
-        const typePill=`<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--accent-light);color:var(--accent);white-space:nowrap;">${esc(typeLabel)}</span>`;
-        const preview=c.message?c.message.slice(0,80)+(c.message.length>80?'…':''):'—';
-        return `<tr>
-          <td style="white-space:nowrap;color:var(--text3);font-size:12px;">${esc(date)}</td>
-          <td>${typePill}</td>
-          <td style="white-space:nowrap;">${esc((c.firstName||'')+' '+(c.lastName||''))}</td>
-          <td style="font-size:12px;"><a href="mailto:${esc(c.email)}" style="color:var(--accent);">${esc(c.email||'—')}</a></td>
-          <td style="font-size:12px;color:var(--text2);max-width:260px;">${esc(preview)}</td>
-          <td><button class="row-btn" onclick="showContactDetail('${esc(c.id)}')"><i class="ti ti-eye"></i> View</button></td>
-        </tr>`;
-      }).join('')}</tbody>
-    </table>`;
-};
-
-window.showContactDetail=function(id){
-  const c=CONTACTS_DATA.find(x=>x.id===id); if(!c) return;
-  const date=new Date(c.ts||0).toLocaleString('en-NZ',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-  const typeLabel=CONTACT_TYPE_LABELS[c.type]||c.type||'—';
-  const lines=[
-    ['Date',date],['Type',typeLabel],
-    ['Name',(c.firstName||'')+' '+(c.lastName||'')],
-    ['Email',c.email||'—'],
-    ...(c.organisation?[['Organisation',c.organisation]]:[]),
-  ];
-  const detail=document.createElement('div');
-  detail.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;';
-  detail.innerHTML=`
-    <div style="background:var(--bg);border-radius:var(--r-lg);width:min(540px,96vw);max-height:88vh;overflow-y:auto;padding:24px 28px;position:relative;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-        <p style="font-size:15px;font-weight:500;">Message detail</p>
-        <button onclick="this.closest('[style*=fixed]').remove()" style="border:none;background:transparent;cursor:pointer;font-size:18px;color:var(--text2);"><i class="ti ti-x"></i></button>
-      </div>
-      <table style="width:100%;font-size:13px;margin-bottom:16px;">
-        ${lines.map(([k,v])=>`<tr><td style="color:var(--text3);padding:5px 0;width:110px;">${esc(k)}</td><td style="color:var(--text);padding:5px 0;">${esc(v)}</td></tr>`).join('')}
-      </table>
-      <p style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Message</p>
-      <p style="font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap;background:var(--bg2);border-radius:var(--r-md);padding:12px 14px;">${esc(c.message||'')}</p>
-      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
-        <a href="mailto:${esc(c.email)}" class="btn btn-primary"><i class="ti ti-mail" style="margin-right:4px;"></i> Reply by email</a>
-        <button class="btn" onclick="this.closest('[style*=fixed]').remove()">Close</button>
-      </div>
-    </div>`;
-  document.body.appendChild(detail);
-  detail.addEventListener('click',e=>{ if(e.target===detail) detail.remove(); });
-};
-
 // Admin "Feedback" tab — only ever needs the written comments (the things that
 // actually require moderation: hide/show, reply, delete). Plain star ratings
 // with no text live in the separate `feedback` collection and don't show up
@@ -1992,7 +1697,6 @@ window.showPage=function(p,extra){
     if(isMainAdmin) refreshReviewBadge();
   }
   else if(p==='about'){ document.getElementById('pageAbout').classList.add('active'); document.querySelectorAll('.nav-item[data-page="about"]').forEach(el=>el.classList.add('active')); }
-  else if(p==='contact'){ document.getElementById('pageContact').classList.add('active'); document.querySelectorAll('.nav-item[data-page="contact"]').forEach(el=>el.classList.add('active')); renderContactView(); }
 };
 
 
@@ -2528,10 +2232,9 @@ window.saveTopicsHeroContent=async function(){
 const NAV_FIXED_DEFS={
   topics:{label:'Topics',  page:'topics'},
   dict:  {label:'Dictionary', page:'dict'},
-  about: {label:'About',   page:'about'},
-  contact:{label:'Contact', page:'contact'}
+  about: {label:'About',   page:'about'}
 };
-let NAV_ORDER=[ {type:'fixed',key:'topics'}, {type:'fixed',key:'dict'}, {type:'fixed',key:'about'}, {type:'fixed',key:'contact'} ];
+let NAV_ORDER=[ {type:'fixed',key:'topics'}, {type:'fixed',key:'dict'}, {type:'fixed',key:'about'} ];
 let navManageMode=false;
 let activeCatOptFieldId=null; // which custom category's options page is currently shown, if any
 let DICT_CONTEXT=null; // {title, backLabel, backAction} when Dictionary was entered via a Topic/category-option card; null = plain "All signs" view, no Back button
@@ -2575,7 +2278,7 @@ window.renderHeaderNav=function(){
   if(mgBtn) mgBtn.innerHTML=navManageMode?'<i class="ti ti-check"></i> Done':'<i class="ti ti-arrows-move"></i> Manage nav';
 
   const currentActive = document.querySelector('.page.active')?.id;
-  const activePage = (currentActive==='pageTopics'||currentActive==='pageCategoryOptions') ? 'topics' : currentActive==='pageDict'?'dict' : currentActive==='pageAbout'?'about' : currentActive==='pageContact'?'contact' : '';
+  const activePage = (currentActive==='pageTopics'||currentActive==='pageCategoryOptions') ? 'topics' : currentActive==='pageDict'?'dict' : currentActive==='pageAbout'?'about' : '';
   const activeFieldId = currentActive==='pageCategoryOptions' ? activeCatOptFieldId : null;
 
   nav.innerHTML='';
@@ -3415,12 +3118,15 @@ window.confirmDelete=async function(){
 
 /* ══ ADMIN TABS ══ */
 window.switchAdminTab=async function(tab){
-  ['signs','options','handshapes','feedback','review','elan','contacts'].forEach(t=>{
+  ['signs','options','handshapes','feedback','review','elan'].forEach(t=>{
     const k=t.charAt(0).toUpperCase()+t.slice(1);
     document.getElementById('at'+k)?.classList.toggle('active',t===tab);
     document.getElementById('ap'+k)?.classList.toggle('active',t===tab);
   });
   document.getElementById('addSignBtn').style.display=tab==='signs'?'':'none';
+  // Data (CATEGORIES/TOPICS/etc.) loads from Firestore asynchronously on page load.
+  // If a tab is opened before that finishes, show a loading placeholder instead of
+  // rendering against still-empty arrays (which looked like a permanently blank panel).
   if(tab==='options'){
     const wrap=document.getElementById('optionsCardsWrap');
     if(wrap && !wrap.children.length) wrap.innerHTML='<p style="font-size:12px;color:var(--text3);padding:8px 2px;">Loading…</p>';
@@ -3430,7 +3136,6 @@ window.switchAdminTab=async function(tab){
   if(tab==='handshapes') renderHsMgGrid();
   if(tab==='feedback')   renderFeedbackAdmin();
   if(tab==='review')     renderPendingReviewsAdmin();
-  if(tab==='contacts')   loadAndRenderContacts();
 };
 
 /* ══ CATEGORIES & TAGS PANEL (per-document model) ══ */
@@ -3963,7 +3668,6 @@ async function init(){
   try{ await dataLoadedPromise; }
   catch(e){ console.error(e); showToast('⚠ Firebase connection error. Check your config and Firestore rules.'); }
   await loadAboutContent();
-  await loadContactContent();
   await loadTopicsHeroContent();
   await loadNavOrder();
   renderHeaderNav();
