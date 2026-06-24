@@ -387,6 +387,15 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .cf-landing-toggle input{cursor:pointer;}
 ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px;}
 
+/* ══ About us nav dropdown ══ */
+.nav-dropdown-wrap{position:relative;display:flex;align-items:stretch;}
+.nav-dropdown-menu{display:none;position:absolute;top:100%;left:0;min-width:180px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--r-md);box-shadow:0 8px 24px rgba(0,0,0,0.14);z-index:200;overflow:hidden;}
+.nav-dropdown-wrap:hover .nav-dropdown-menu,.nav-dropdown-menu:hover{display:block;}
+.nav-dropdown-item{display:block;padding:10px 16px;font-size:13px;color:var(--text);cursor:pointer;border-bottom:0.5px solid var(--border);white-space:nowrap;}
+.nav-dropdown-item:last-child{border-bottom:none;}
+.nav-dropdown-item:hover{background:var(--accent-light);color:var(--accent);}
+.nav-dropdown-item.active{color:var(--accent);font-weight:500;}
+
 /* ══ Mobile-only elements: hidden by default on desktop ══ */
 .mobile-menu-btn,.mobile-search-btn{display:none;background:none;border:none;color:white;font-size:20px;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--r-md);cursor:pointer;flex-shrink:0;}
 .mobile-menu-btn:hover,.mobile-search-btn:hover{background:rgba(255,255,255,0.12);}
@@ -500,8 +509,31 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   .modal-box{width:94vw;padding:16px;}
   .modal-video{width:92vw;}
 
-  /* ── About page ── */
-  #pageAbout > div{margin:16px auto;padding:20px 18px;width:calc(100% - 32px);}
+  /* ══ About us sub-nav tabs ══ */
+.aboutus-tab{padding:7px 16px;border-radius:var(--r-md);border:none;background:transparent;font-size:13px;color:var(--text2);cursor:pointer;font-weight:500;}
+.aboutus-tab:hover{background:var(--bg2);color:var(--text);}
+.aboutus-tab.active{background:var(--accent);color:white;}
+/* ══ Rich text editor toolbar ══ */
+.rte-toolbar{display:flex;flex-wrap:wrap;gap:3px;padding:8px 10px;background:var(--bg2);border:0.5px solid var(--border2);border-bottom:none;border-radius:var(--r-md) var(--r-md) 0 0;}
+.rte-btn{display:flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 6px;border-radius:var(--r-sm);border:0.5px solid transparent;background:transparent;color:var(--text);cursor:pointer;font-size:13px;font-weight:500;}
+.rte-btn:hover{background:var(--bg3);border-color:var(--border2);}
+.rte-btn.active{background:var(--accent-light);color:var(--accent);border-color:var(--accent);}
+.rte-sep{width:0.5px;height:20px;background:var(--border2);margin:0 3px;align-self:center;}
+.rte-select{font-size:12px;padding:3px 6px;border-radius:var(--r-sm);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);cursor:pointer;height:28px;}
+.rte-color-btn{position:relative;}
+.rte-color-btn input[type=color]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.rte-editor{min-height:260px;padding:16px;border:0.5px solid var(--border2);border-radius:0 0 var(--r-md) var(--r-md);background:var(--bg);color:var(--text);font-size:14px;line-height:1.7;outline:none;overflow-y:auto;}
+.rte-editor:focus{border-color:var(--accent);}
+.rte-editor a{color:var(--accent);text-decoration:underline;}
+.rte-editor blockquote{border-left:3px solid var(--accent);margin:8px 0;padding:4px 12px;color:var(--text2);}
+.aboutus-content-view{font-size:14px;line-height:1.75;color:var(--text2);}
+.aboutus-content-view h1,.aboutus-content-view h2,.aboutus-content-view h3{color:var(--text);margin:1em 0 0.4em;}
+.aboutus-content-view a{color:var(--accent);text-decoration:underline;}
+.aboutus-content-view blockquote{border-left:3px solid var(--accent);margin:8px 0;padding:4px 12px;color:var(--text2);}
+
+/* ══ Mobile About us ══ */
+@media(max-width:600px){
+  #pageAboutUs>div{margin:16px auto;padding:0 12px 40px;}
 }
 
 /* Admin & login pages are excluded from the mobile layout above —
@@ -759,24 +791,18 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   </div>
 </div>
 
-<div class="page" id="pageAbout">
-  <div style="max-width:600px;margin:40px auto;background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-      <h2 id="aboutTitleView" style="font-size:20px;font-weight:500;margin-bottom:8px;">About SignBiz</h2>
-      <button class="row-btn" id="aboutEditBtn" style="display:none;flex-shrink:0;" onclick="enterAboutEdit()"><i class="ti ti-edit"></i> Edit</button>
+<div class="page" id="pageAboutUs">
+  <div style="max-width:760px;margin:40px auto;padding:0 16px 60px;">
+    <!-- Sub-nav tabs -->
+    <div style="display:flex;gap:2px;margin-bottom:24px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:6px;width:fit-content;">
+      <button class="aboutus-tab" data-sub="mission" onclick="showAboutSub('mission')">Mission</button>
+      <button class="aboutus-tab" data-sub="conditions" onclick="showAboutSub('conditions')">Conditions of use</button>
+      <button class="aboutus-tab" data-sub="privacy" onclick="showAboutSub('privacy')">Privacy Policy</button>
     </div>
-    <div id="aboutBodyView" style="color:var(--text2);line-height:1.7;margin-bottom:12px;white-space:pre-wrap;">SignBiz is a business sign language dictionary for Deaf and hard-of-hearing students.</div>
-
-    <div id="aboutEditForm" style="display:none;">
-      <div class="form-field"><label>Title</label><input type="text" id="aboutTitleInput"/></div>
-      <div class="form-field"><label>Body</label><textarea id="aboutBodyInput" style="min-height:160px;"></textarea></div>
-      <div class="form-footer" style="margin-top:6px;">
-        <button class="btn" onclick="cancelAboutEdit()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveAboutContent()">Save</button>
-      </div>
-    </div>
-
-    <button class="btn" style="margin-top:16px;" onclick="showPage('dict')"><i class="ti ti-arrow-left"></i> Back to dictionary</button>
+    <!-- Sub-page panels -->
+    <div id="aboutSubMission" class="aboutus-panel" style="display:none;"></div>
+    <div id="aboutSubConditions" class="aboutus-panel" style="display:none;"></div>
+    <div id="aboutSubPrivacy" class="aboutus-panel" style="display:none;"></div>
   </div>
 </div>
 
@@ -1654,61 +1680,228 @@ function resolveDisplayName(){
   return nick || currentUser.displayName || 'Anonymous';
 }
 
-/* ══ ABOUT PAGE CONTENT (siteContent/about) — admin-editable, public-readable ══ */
-let ABOUT_CONTENT={
-  title:'About SignBiz',
-  body:'SignBiz is a business sign language dictionary for Deaf and hard-of-hearing students.'
-};
+/* ══ ABOUT US — three sub-pages with rich-text editor (siteContent/aboutMission|aboutConditions|aboutPrivacy) ══ */
+const ABOUT_SUB_DEFS=[
+  {key:'mission',    fsKey:'aboutMission',    label:'Mission',
+   defaultTitle:'Our Mission',
+   defaultBody:`<p>SignBiz was built to give Deaf and hard-of-hearing high school students — and the educators who support them — direct access to the business vocabulary they need in the workplace and in entrepreneurship education.</p>
+<h2>Why SignBiz?</h2>
+<p>Business sign language is rarely taught in schools, and professional glossaries for ASL are hard to find. We set out to change that.</p>
+<p>This dictionary is grounded in real data: our sign entries are informed by recordings from <strong>20 Deaf adults with business or business-education backgrounds</strong>, whose linguistic knowledge shapes every entry. Their expertise — not guesswork — is what makes SignBiz a reliable resource for students and teachers alike.</p>
+<h2>Who is it for?</h2>
+<p>SignBiz is designed for <strong>HS (high school) students</strong> taking business or entrepreneurship courses, their teachers, and anyone who wants to communicate more clearly in professional Deaf and hearing-mixed environments.</p>
+<h2>How to use SignBiz</h2>
+<p>Browse by topic, search for a specific word, or explore signs by handshape. Each entry includes a <em>How to Sign</em> video, a <em>Concept</em> explanation, and an <em>Example</em> sentence in context.</p>
+<p>If you spot an error or a missing sign, please use the <strong>Feedback</strong> option on any entry, or reach out through the <strong>Contact</strong> page.</p>`},
+  {key:'conditions', fsKey:'aboutConditions', label:'Conditions of use',
+   defaultTitle:'Conditions of Use',
+   defaultBody:`<p>By accessing and using SignBiz (<em>aslsignbank.com</em> or any hosted mirror), you agree to the following conditions.</p>
+<h2>Permitted use</h2>
+<p>SignBiz content — including sign videos, images, and descriptions — is made available for <strong>educational and non-commercial purposes</strong>. You may share and re-use materials provided you give appropriate credit (see Citation below).</p>
+<h2>Prohibited use</h2>
+<p>You may <strong>not</strong> use SignBiz content for commercial gain without prior written permission. You may not reproduce the database in bulk, train machine-learning models on the content without permission, or represent SignBiz materials as your own original work.</p>
+<h2>Citation</h2>
+<p>When referencing SignBiz in academic or published work, please use:</p>
+<blockquote>SignBiz Business Sign Language Dictionary. Retrieved from [URL].</blockquote>
+<h2>Research data</h2>
+<p>The ELAN annotation data visible to registered researchers is derived from recordings contributed by Deaf participants under informed consent. This data is provided solely for linguistic research. Do not attempt to identify individual participants.</p>
+<h2>Changes to these conditions</h2>
+<p>We may update these conditions at any time. Continued use of the site constitutes acceptance of any revised terms.</p>`},
+  {key:'privacy',    fsKey:'aboutPrivacy',    label:'Privacy Policy',
+   defaultTitle:'Privacy Policy',
+   defaultBody:`<p><em>Last updated: 2026</em></p>
+<h2>What we collect</h2>
+<p>SignBiz does not collect personally identifiable information (PII) from general visitors. When you use the site, your browser may automatically transmit non-identifying information (IP address, browser type, page visited) that is used solely to monitor site health and improve the user experience.</p>
+<h2>Research participant data</h2>
+<p>ELAN sign-annotation data visible to registered researchers was collected from <strong>20 Deaf adults</strong> with business or business-education backgrounds, under informed consent. This data is used for linguistic analysis only. No participant is identified by name in the public-facing dictionary. Researcher accounts that access this data are subject to separate data-use agreements.</p>
+<h2>Contact form</h2>
+<p>If you submit a message through our Contact page, we store your name, email address, and message text solely to respond to your enquiry. We do not share this information with third parties.</p>
+<h2>Cookies</h2>
+<p>SignBiz uses session cookies to maintain your browsing session (e.g. language preference). No persistent tracking cookies are used for advertising or profiling.</p>
+<h2>Third-party services</h2>
+<p>Videos are hosted on YouTube (Google). Watching embedded videos is subject to <a href="https://policies.google.com/privacy" target="_blank">Google's Privacy Policy</a>. Our database is hosted on Google Firebase; data is stored in accordance with <a href="https://firebase.google.com/support/privacy" target="_blank">Firebase's data processing terms</a>.</p>
+<h2>Your rights</h2>
+<p>You may request deletion of any personal data you have provided (e.g. contact form submissions) by emailing us through the Contact page. We will action your request within 30 days.</p>
+<h2>Contact</h2>
+<p>Questions about this policy? Please use the <strong>Contact</strong> page.</p>`}
+];
 
-async function loadAboutContent(){
-  try{
-    const snap=await getDoc(doc(db,'siteContent','about'));
-    if(snap.exists()){
-      const d=snap.data();
-      if(d.title) ABOUT_CONTENT.title=d.title;
-      if(d.body)  ABOUT_CONTENT.body=d.body;
-    }
-  }catch(err){ console.error('loadAboutContent failed:',err); }
-  renderAboutView();
+let ABOUT_SUB_CONTENT={}; // key → {title, body (HTML string)}
+ABOUT_SUB_DEFS.forEach(d=>{ ABOUT_SUB_CONTENT[d.key]={title:d.defaultTitle, body:d.defaultBody}; });
+
+async function loadAboutSubContent(){
+  for(const d of ABOUT_SUB_DEFS){
+    try{
+      const snap=await getDoc(doc(db,'siteContent',d.fsKey));
+      if(snap.exists()){
+        const data=snap.data();
+        if(data.title) ABOUT_SUB_CONTENT[d.key].title=data.title;
+        if(data.body)  ABOUT_SUB_CONTENT[d.key].body=data.body;
+      }
+    }catch(err){ console.error('loadAboutSubContent failed for '+d.key,err); }
+  }
 }
 
-function renderAboutView(){
-  const tEl=document.getElementById('aboutTitleView');
-  const bEl=document.getElementById('aboutBodyView');
-  if(tEl) tEl.textContent=ABOUT_CONTENT.title;
-  if(bEl) bEl.textContent=ABOUT_CONTENT.body;
-  const editBtn=document.getElementById('aboutEditBtn');
-  if(editBtn) editBtn.style.display=isAdmin?'flex':'none';
+let aboutCurrentSub='mission';
+let aboutEditMode=false;
+
+window.showAboutSub=function(sub){
+  aboutCurrentSub=sub;
+  document.body.dataset.aboutSubpage=sub;
+  document.querySelectorAll('.aboutus-tab').forEach(t=>t.classList.toggle('active',t.dataset.sub===sub));
+  document.querySelectorAll('.aboutus-panel').forEach(p=>p.style.display='none');
+  const panel=document.getElementById('aboutSubPanel_'+sub);
+  if(panel){ panel.style.display='block'; }
+  else { renderAboutSubPanel(sub); }
+};
+
+function renderAboutSubPanel(sub){
+  const def=ABOUT_SUB_DEFS.find(d=>d.key===sub); if(!def) return;
+  const content=ABOUT_SUB_CONTENT[sub];
+  const containerId='aboutSubPanel_'+sub;
+  let panel=document.getElementById(containerId);
+  if(!panel){
+    panel=document.createElement('div');
+    panel.id=containerId;
+    panel.className='aboutus-panel';
+    document.getElementById('aboutSubMission').parentNode.appendChild(panel);
+    // hide the placeholder divs we no longer use
+    ['aboutSubMission','aboutSubConditions','aboutSubPrivacy'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.style.display='none';
+    });
+  }
+  panel.style.display='block';
+  panel.innerHTML=`
+    <div style="background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;">
+        <h2 id="asTitleView_${sub}" style="font-size:20px;font-weight:500;color:var(--text);">${esc(content.title)}</h2>
+        <button class="row-btn" id="asEditBtn_${sub}" style="display:${isAdmin?'flex':'none'};flex-shrink:0;" onclick="enterAboutSubEdit('${sub}')"><i class="ti ti-edit"></i> Edit</button>
+      </div>
+      <div id="asBodyView_${sub}" class="aboutus-content-view">${content.body}</div>
+      <div id="asEditForm_${sub}" style="display:none;margin-top:16px;">
+        <div class="form-field"><label>Page title</label><input type="text" id="asTitleInput_${sub}" value="${esc(content.title)}"/></div>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:5px;font-weight:500;">Body</label>
+          ${buildRteToolbar(sub)}
+          <div id="asRteBody_${sub}" class="rte-editor" contenteditable="true" spellcheck="true">${content.body}</div>
+        </div>
+        <div class="form-footer" style="margin-top:6px;">
+          <button class="btn" onclick="cancelAboutSubEdit('${sub}')">Cancel</button>
+          <button class="btn btn-primary" onclick="saveAboutSub('${sub}')">Save</button>
+        </div>
+      </div>
+    </div>
+  `;
+  // Bind RTE toolbar events after inserting into DOM
+  bindRteToolbar(sub);
 }
 
-window.enterAboutEdit=function(){
-  document.getElementById('aboutTitleInput').value=ABOUT_CONTENT.title;
-  document.getElementById('aboutBodyInput').value=ABOUT_CONTENT.body;
-  document.getElementById('aboutTitleView').style.display='none';
-  document.getElementById('aboutBodyView').style.display='none';
-  document.getElementById('aboutEditBtn').style.display='none';
-  document.getElementById('aboutEditForm').style.display='block';
+function buildRteToolbar(sub){
+  return `<div class="rte-toolbar" id="rteToolbar_${sub}">
+    <select class="rte-select" id="rteHeading_${sub}" onchange="rteExec('${sub}','formatBlock',this.value)">
+      <option value="p">Paragraph</option>
+      <option value="h1">Heading 1</option>
+      <option value="h2">Heading 2</option>
+      <option value="h3">Heading 3</option>
+    </select>
+    <div class="rte-sep"></div>
+    <button class="rte-btn" title="Bold" onclick="rteExec('${sub}','bold')"><strong>B</strong></button>
+    <button class="rte-btn" title="Italic" onclick="rteExec('${sub}','italic')"><em>I</em></button>
+    <button class="rte-btn" title="Underline" onclick="rteExec('${sub}','underline')"><u>U</u></button>
+    <div class="rte-sep"></div>
+    <button class="rte-btn" title="Align left" onclick="rteExec('${sub}','justifyLeft')"><i class="ti ti-align-left"></i></button>
+    <button class="rte-btn" title="Align centre" onclick="rteExec('${sub}','justifyCenter')"><i class="ti ti-align-center"></i></button>
+    <button class="rte-btn" title="Align right" onclick="rteExec('${sub}','justifyRight')"><i class="ti ti-align-right"></i></button>
+    <div class="rte-sep"></div>
+    <button class="rte-btn" title="Bullet list" onclick="rteExec('${sub}','insertUnorderedList')"><i class="ti ti-list"></i></button>
+    <button class="rte-btn" title="Numbered list" onclick="rteExec('${sub}','insertOrderedList')"><i class="ti ti-list-numbers"></i></button>
+    <button class="rte-btn" title="Blockquote" onclick="rteBlockquote('${sub}')"><i class="ti ti-quote"></i></button>
+    <div class="rte-sep"></div>
+    <button class="rte-btn rte-color-btn" title="Text colour"><i class="ti ti-letter-a" style="text-decoration:underline;"></i><input type="color" id="rteColor_${sub}" value="#1a1a18" oninput="rteExec('${sub}','foreColor',this.value)"/></button>
+    <div class="rte-sep"></div>
+    <button class="rte-btn" title="Insert link" onclick="rteInsertLink('${sub}')"><i class="ti ti-link"></i></button>
+    <button class="rte-btn" title="Remove link" onclick="rteExec('${sub}','unlink')"><i class="ti ti-link-off"></i></button>
+  </div>`;
+}
+
+function bindRteToolbar(sub){
+  // Focus editor when any toolbar button is clicked (to keep selection)
+  const toolbar=document.getElementById('rteToolbar_'+sub);
+  const editor=document.getElementById('asRteBody_'+sub);
+  if(!toolbar||!editor) return;
+  toolbar.addEventListener('mousedown',e=>{
+    if(e.target.closest('input[type=color]')) return; // allow colour picker focus
+    e.preventDefault(); // prevent editor losing selection
+  });
+}
+
+window.rteExec=function(sub, cmd, val){
+  const ed=document.getElementById('asRteBody_'+sub); if(!ed) return;
+  ed.focus();
+  document.execCommand(cmd, false, val||null);
+};
+window.rteBlockquote=function(sub){
+  const ed=document.getElementById('asRteBody_'+sub); if(!ed) return;
+  ed.focus();
+  document.execCommand('formatBlock',false,'blockquote');
+};
+window.rteInsertLink=function(sub){
+  const url=prompt('Enter URL (include https://):');
+  if(!url) return;
+  const ed=document.getElementById('asRteBody_'+sub); if(!ed) return;
+  ed.focus();
+  document.execCommand('createLink',false,url);
+  // Open in new tab
+  const sel=window.getSelection();
+  if(sel&&sel.anchorNode){
+    const link=sel.anchorNode.parentElement?.closest('a')||sel.focusNode?.parentElement?.closest('a');
+    if(link) link.target='_blank';
+  }
 };
 
-window.cancelAboutEdit=function(){
-  document.getElementById('aboutTitleView').style.display='';
-  document.getElementById('aboutBodyView').style.display='';
-  document.getElementById('aboutEditBtn').style.display=isAdmin?'flex':'none';
-  document.getElementById('aboutEditForm').style.display='none';
+window.enterAboutSubEdit=function(sub){
+  const ed=document.getElementById('asRteBody_'+sub);
+  if(ed) ed.innerHTML=ABOUT_SUB_CONTENT[sub].body;
+  document.getElementById('asTitleInput_'+sub).value=ABOUT_SUB_CONTENT[sub].title;
+  document.getElementById('asBodyView_'+sub).style.display='none';
+  document.getElementById('asTitleView_'+sub).style.display='none';
+  document.getElementById('asEditBtn_'+sub).style.display='none';
+  document.getElementById('asEditForm_'+sub).style.display='block';
 };
 
-window.saveAboutContent=async function(){
-  const title=document.getElementById('aboutTitleInput').value.trim()||'About SignBiz';
-  const body=document.getElementById('aboutBodyInput').value.trim();
+window.cancelAboutSubEdit=function(sub){
+  document.getElementById('asBodyView_'+sub).style.display='';
+  document.getElementById('asTitleView_'+sub).style.display='';
+  document.getElementById('asEditBtn_'+sub).style.display=isAdmin?'flex':'none';
+  document.getElementById('asEditForm_'+sub).style.display='none';
+};
+
+window.saveAboutSub=async function(sub){
+  const def=ABOUT_SUB_DEFS.find(d=>d.key===sub); if(!def) return;
+  const title=document.getElementById('asTitleInput_'+sub).value.trim()||def.defaultTitle;
+  const body=document.getElementById('asRteBody_'+sub).innerHTML;
   showSaving(true);
-  try{ await setDoc(doc(db,'siteContent','about'),{title,body},{merge:true}); }
-  catch(err){ console.error('saveAboutContent failed:',err); showToast('⚠ Could not save. Try again.'); showSaving(false); return; }
-  showSaving(false);
-  ABOUT_CONTENT.title=title; ABOUT_CONTENT.body=body;
-  renderAboutView();
-  cancelAboutEdit();
-  showToast('About page updated');
+  try{
+    await setDoc(doc(db,'siteContent',def.fsKey),{title,body},{merge:true});
+    ABOUT_SUB_CONTENT[sub]={title,body};
+    document.getElementById('asTitleView_'+sub).textContent=title;
+    document.getElementById('asBodyView_'+sub).innerHTML=body;
+    cancelAboutSubEdit(sub);
+    showToast('Saved');
+  }catch(err){ console.error(err); showToast('⚠ Could not save. Try again.'); }
+  finally{ showSaving(false); }
 };
+
+/* ── Keep legacy about content functions so nothing breaks ── */
+let ABOUT_CONTENT={title:'About SignBiz',body:''};
+async function loadAboutContent(){
+  // Migrated — load the new sub-page system instead
+  await loadAboutSubContent();
+}
+function renderAboutView(){}
+window.enterAboutEdit=function(){};
+window.cancelAboutEdit=function(){};
+window.saveAboutContent=async function(){};
 
 // Admin "Feedback" tab — only ever needs the written comments (the things that
 // actually require moderation: hide/show, reply, delete). Plain star ratings
@@ -1811,7 +2004,11 @@ onAuthStateChanged(auth, async user=>{
   if(document.getElementById('pageAdmin').classList.contains('active')) (dataLoadedPromise||Promise.resolve()).then(renderAdminTable);
   rerenderActiveLandingSurface();
   renderHeaderNav();
-  renderAboutView();
+  // Refresh About Us edit buttons visibility
+  ABOUT_SUB_DEFS.forEach(d=>{
+    const btn=document.getElementById('asEditBtn_'+d.key);
+    if(btn) btn.style.display=isAdmin?'flex':'none';
+  });
   renderContactView();
   if(isMainAdmin) refreshReviewBadge();
   if(isAdmin){ refreshFeedbackBadge(); refreshContactsBadge(); }
@@ -1901,7 +2098,14 @@ window.showPage=function(p,extra){
     if(isMainAdmin) refreshReviewBadge();
     if(isAdmin){ refreshFeedbackBadge(); refreshContactsBadge(); }
   }
-  else if(p==='about'){ document.getElementById('pageAbout').classList.add('active'); document.querySelectorAll('.nav-item[data-page="about"]').forEach(el=>el.classList.add('active')); }
+  else if(p==='aboutus'){ 
+    document.getElementById('pageAboutUs').classList.add('active'); 
+    document.querySelectorAll('.nav-item[data-page="aboutus"]').forEach(el=>el.classList.add('active'));
+    const sub=extra||'mission';
+    document.body.dataset.aboutSubpage=sub;
+    showAboutSub(sub);
+    renderHeaderNav();
+  }
   else if(p==='contact'){ document.getElementById('pageContact').classList.add('active'); document.querySelectorAll('.nav-item[data-page="contact"]').forEach(el=>el.classList.add('active')); renderContactView(); }
 };
 
@@ -2436,12 +2640,14 @@ window.saveTopicsHeroContent=async function(){
    too — nothing about their position is hardcoded once this loads.
 ══════════════════════════════════════ */
 const NAV_FIXED_DEFS={
-  topics:  {label:'Topics',    page:'topics'},
+  topics:  {label:'Topics',     page:'topics'},
   dict:    {label:'Dictionary', page:'dict'},
-  about:   {label:'About',     page:'about'},
-  contact: {label:'Contact',   page:'contact'}
+  aboutus: {label:'About us',   page:'aboutus', hasDropdown:true},
+  contact: {label:'Contact',    page:'contact'}
 };
-let NAV_ORDER=[ {type:'fixed',key:'topics'}, {type:'fixed',key:'dict'}, {type:'fixed',key:'about'}, {type:'fixed',key:'contact'} ];
+// Keep legacy 'about' key in saved navOrder working by aliasing it
+const NAV_KEY_ALIAS={'about':'aboutus'};
+let NAV_ORDER=[ {type:'fixed',key:'topics'}, {type:'fixed',key:'dict'}, {type:'fixed',key:'aboutus'}, {type:'fixed',key:'contact'} ];
 let navManageMode=false;
 let activeCatOptFieldId=null; // which custom category's options page is currently shown, if any
 let DICT_CONTEXT=null; // {title, backLabel, backAction} when Dictionary was entered via a Topic/category-option card; null = plain "All signs" view, no Back button
@@ -2456,9 +2662,12 @@ async function loadNavOrder(){
       // present even if the saved navOrder pre-dates it. New keys are appended
       // at the end so existing ordering is preserved.
       const savedKeys=new Set(saved.filter(e=>e.type==='fixed').map(e=>e.key));
-      const merged=[...saved];
+      // Migrate legacy 'about' key to 'aboutus'
+      const migrated=saved.map(e=>e.type==='fixed'&&e.key==='about'?{...e,key:'aboutus'}:e);
+      const mergedKeys=new Set(migrated.filter(e=>e.type==='fixed').map(e=>e.key));
+      const merged=[...migrated];
       Object.keys(NAV_FIXED_DEFS).forEach(key=>{
-        if(!savedKeys.has(key)) merged.push({type:'fixed',key});
+        if(!mergedKeys.has(key)) merged.push({type:'fixed',key});
       });
       NAV_ORDER=merged;
     }
@@ -2494,13 +2703,42 @@ window.renderHeaderNav=function(){
   if(mgBtn) mgBtn.innerHTML=navManageMode?'<i class="ti ti-check"></i> Done':'<i class="ti ti-arrows-move"></i> Manage nav';
 
   const currentActive = document.querySelector('.page.active')?.id;
-  const activePage = (currentActive==='pageTopics'||currentActive==='pageCategoryOptions') ? 'topics' : currentActive==='pageDict'?'dict' : currentActive==='pageAbout'?'about' : currentActive==='pageContact'?'contact' : '';
+  const activePage = (currentActive==='pageTopics'||currentActive==='pageCategoryOptions') ? 'topics' : currentActive==='pageDict'?'dict' : currentActive==='pageAboutUs'?'aboutus' : currentActive==='pageContact'?'contact' : '';
+  const activeSubPage = document.body.dataset.aboutSubpage||'';
   const activeFieldId = currentActive==='pageCategoryOptions' ? activeCatOptFieldId : null;
 
   nav.innerHTML='';
   navRenderList().forEach(item=>{
     const el=document.createElement('div');
     const isItemActive = item.page===activePage && (item.type!=='custom' || item.fieldId===activeFieldId);
+    if(!navManageMode && item.key==='aboutus'){
+      // About us with dropdown
+      const wrap=document.createElement('div');
+      wrap.className='nav-dropdown-wrap';
+      const navEl=document.createElement('div');
+      navEl.className='nav-item'+(isItemActive?' active':'');
+      navEl.dataset.page='aboutus';
+      navEl.textContent='About us ▾';
+      navEl.onclick=()=>showPage('aboutus','mission');
+      wrap.appendChild(navEl);
+      const menu=document.createElement('div');
+      menu.className='nav-dropdown-menu';
+      const subItems=[
+        {key:'mission',label:'Mission'},
+        {key:'conditions',label:'Conditions of use'},
+        {key:'privacy',label:'Privacy Policy'}
+      ];
+      subItems.forEach(si=>{
+        const it=document.createElement('div');
+        it.className='nav-dropdown-item'+(activeSubPage===si.key?' active':'');
+        it.textContent=si.label;
+        it.onclick=(e)=>{ e.stopPropagation(); showPage('aboutus',si.key); };
+        menu.appendChild(it);
+      });
+      wrap.appendChild(menu);
+      nav.appendChild(wrap);
+      return;
+    }
     el.className='nav-item'+(isItemActive?' active':'');
     el.dataset.page=item.page;
     if(item.type==='custom') el.dataset.fieldId=item.fieldId;
@@ -4135,6 +4373,8 @@ async function init(){
   const msb=document.getElementById('mobileSearchBtn');
   if(msb) msb.style.display='none';
   buildFilterPanel(); buildFilterTags(); buildHsGrid(); doFilter();
+  // Pre-render first About Us sub-panel so it's ready
+  document.body.dataset.aboutSubpage='mission';
   showPage('topics');
 }
 
