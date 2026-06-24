@@ -515,6 +515,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .aboutus-tab.active{background:var(--accent);color:white;border-color:var(--accent);font-weight:600;box-shadow:0 2px 8px rgba(26,74,138,0.18);}
 .aboutus-tab.dragging{opacity:0.4;}
 .aboutus-tab.drag-over{box-shadow:0 0 0 2px var(--accent);}
+.aboutus-tab.pending-delete{opacity:0.55;border-style:dashed;color:var(--danger);}
 /* ══ Rich text editor toolbar ══ */
 .rte-toolbar{display:flex;flex-wrap:wrap;gap:3px;padding:8px 10px;background:var(--bg2);border:0.5px solid var(--border2);border-bottom:none;border-radius:var(--r-md) var(--r-md) 0 0;}
 .rte-btn{display:flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 6px;border-radius:var(--r-sm);border:0.5px solid transparent;background:transparent;color:var(--text);cursor:pointer;font-size:13px;font-weight:500;}
@@ -1366,6 +1367,10 @@ window.approveReview=async function(reviewId){
   try{
     if(r.action==='delete'){
       await deleteDoc(doc(db,r.collection,r.docId));
+      // About-Us custom sub-pages also need their registry entry and
+      // order slot removed — a plain deleteDoc on siteContent/{fsKey}
+      // alone would leave a dangling, now-broken tab in aboutExtraPages.
+      if(r.collection==='siteContent'){ await finalizeAboutPageDeletion(r.docId); }
     }else{
       await setDoc(doc(db,r.collection,r.docId),{_pendingReviewId:null},{merge:true});
     }
@@ -1385,6 +1390,9 @@ window.rejectReview=async function(reviewId){
       // Restore the doc exactly as it was (clears _hidden and _pendingReviewId)
       const restored={...r.snapshotBefore, _hidden:false, _pendingReviewId:null};
       await setDoc(doc(db,r.collection,r.docId), restored);
+      // Clear the "pending removal" flag on the About-Us tab so it's a
+      // normal tab again instead of staying stuck in limbo.
+      if(r.collection==='siteContent'){ await clearAboutPagePendingDelete(r.docId); }
     }else{
       const restored={...r.snapshotBefore, _pendingReviewId:null};
       await setDoc(doc(db,r.collection,r.docId), restored);
@@ -1396,12 +1404,34 @@ window.rejectReview=async function(reviewId){
   await refreshAfterReviewAction();
 };
 
+// Called after Main Admin approves the deletion of a custom About-Us
+// page: removes it from the registry doc and from the shared tab order.
+async function finalizeAboutPageDeletion(fsKey){
+  const def=ABOUT_EXTRA_DEFS.find(d=>d.fsKey===fsKey);
+  ABOUT_EXTRA_DEFS=ABOUT_EXTRA_DEFS.filter(d=>d.fsKey!==fsKey);
+  await saveAboutExtraPagesRegistry();
+  if(def){
+    ABOUT_TAB_ORDER=ABOUT_TAB_ORDER.filter(k=>k!==def.key);
+    await saveAboutTabOrder();
+    delete ABOUT_SUB_CONTENT[def.key];
+  }
+}
+// Called after Main Admin rejects the deletion of a custom About-Us
+// page: clears the pending-removal flag so the tab is normal again.
+async function clearAboutPagePendingDelete(fsKey){
+  const def=ABOUT_EXTRA_DEFS.find(d=>d.fsKey===fsKey);
+  if(def) def._pendingDeleteReviewId=null;
+  await saveAboutExtraPagesRegistry();
+}
+
 async function refreshAfterReviewAction(){
   await loadAll();
+  await loadAboutSubContent();
   await loadPendingReviews();
   buildFilterPanel(); buildFilterTags(); buildHsGrid(); doFilter();
   rerenderActiveLandingSurface();
   renderHeaderNav();
+  renderAboutTabBar();
   if(document.getElementById('pageAdmin').classList.contains('active')){
     renderAdminTable();
     if(document.getElementById('apReview')?.classList.contains('active')) renderPendingReviewsAdmin();
@@ -1776,6 +1806,7 @@ async function loadAboutSubContent(){
     }catch(err){ console.error('loadAboutSubContent failed for '+d.key,err); }
   }
   await loadAboutExtraPages();
+  await loadAboutTabOrder();
 }
 
 // Custom "+ New page" sub-pages previously lived ONLY in the in-memory
@@ -1783,7 +1814,8 @@ async function loadAboutSubContent(){
 // reload the tab (and its order) vanished, even though its content was
 // saved at siteContent/aboutCustom_* once saveAboutSub was fixed to find
 // it. This registry doc is the source of truth for which custom pages
-// exist and what order they're in.
+// exist, and (via _pendingDeleteReviewId) whether one is currently
+// awaiting Main Admin approval to be removed.
 async function loadAboutExtraPages(){
   ABOUT_EXTRA_DEFS=[];
   try{
@@ -1791,7 +1823,7 @@ async function loadAboutExtraPages(){
     if(snap.exists() && Array.isArray(snap.data().pages)){
       for(const p of snap.data().pages){
         if(!p.key||!p.fsKey) continue;
-        const def={key:p.key, fsKey:p.fsKey, label:p.label||p.key, defaultTitle:p.label||p.key, defaultBody:'<p>Write content here.</p>'};
+        const def={key:p.key, fsKey:p.fsKey, label:p.label||p.key, defaultTitle:p.label||p.key, defaultBody:'<p>Write content here.</p>', _pendingDeleteReviewId:p._pendingDeleteReviewId||null};
         ABOUT_EXTRA_DEFS.push(def);
         ABOUT_SUB_CONTENT[def.key]={title:def.defaultTitle, body:def.defaultBody};
         try{
@@ -1808,15 +1840,23 @@ async function loadAboutExtraPages(){
 }
 
 async function saveAboutExtraPagesRegistry(){
-  const pages=ABOUT_EXTRA_DEFS.map(d=>({key:d.key, fsKey:d.fsKey, label:d.label}));
+  const pages=ABOUT_EXTRA_DEFS.map(d=>({key:d.key, fsKey:d.fsKey, label:d.label, _pendingDeleteReviewId:d._pendingDeleteReviewId||null}));
   await setDoc(doc(db,'siteContent','aboutExtraPages'),{pages});
 }
 
 let aboutCurrentSub='mission';
 let aboutEditMode=false;
 let ABOUT_EXTRA_DEFS=[];
+// Master order covering EVERY tab — built-in (mission/conditions/privacy/
+// contact_sub) and custom — as a flat array of keys. Previously only
+// custom tabs were reorderable because there was no shared order list;
+// the 4 built-in tabs always rendered first, hardcoded, via
+// ABOUT_SUB_DEFS/allAboutDefs() concatenation order. Now every tab's
+// position comes from this single array, so any tab can be dragged
+// anywhere relative to any other.
+let ABOUT_TAB_ORDER=['mission','conditions','privacy','contact_sub'];
 
-function allAboutDefs(){
+function allAboutDefsUnordered(){
   return [
     ...ABOUT_SUB_DEFS,
     {key:'contact_sub', fsKey:'aboutContact', label:'Contact', defaultTitle:'Contact', defaultBody:'', _isContactSub:true},
@@ -1824,30 +1864,48 @@ function allAboutDefs(){
   ];
 }
 
+function allAboutDefs(){
+  const defs=allAboutDefsUnordered();
+  const byKey=new Map(defs.map(d=>[d.key,d]));
+  // Make sure every def is represented in the order (newly added custom
+  // pages not yet in ABOUT_TAB_ORDER get appended at the end).
+  const orderedKeys=[...ABOUT_TAB_ORDER.filter(k=>byKey.has(k))];
+  byKey.forEach((d,k)=>{ if(!orderedKeys.includes(k)) orderedKeys.push(k); });
+  return orderedKeys.map(k=>byKey.get(k));
+}
+
+async function loadAboutTabOrder(){
+  try{
+    const snap=await getDoc(doc(db,'siteContent','aboutTabOrder'));
+    if(snap.exists() && Array.isArray(snap.data().order) && snap.data().order.length){
+      ABOUT_TAB_ORDER=snap.data().order;
+    }
+  }catch(err){ console.error('loadAboutTabOrder failed:',err); }
+}
+async function saveAboutTabOrder(){
+  await setDoc(doc(db,'siteContent','aboutTabOrder'),{order:ABOUT_TAB_ORDER});
+}
+
 let aboutTabDragSrc=null;
 
 function renderAboutTabBar(){
   const bar=document.getElementById('aboutTabBar'); if(!bar) return;
   bar.innerHTML='';
-  const extraKeys=new Set(ABOUT_EXTRA_DEFS.map(d=>d.key));
   allAboutDefs().forEach(d=>{
     const btn=document.createElement('button');
-    btn.className='aboutus-tab'+(aboutCurrentSub===d.key?' active':'');
+    const pendingDelete=!!d._pendingDeleteReviewId;
+    btn.className='aboutus-tab'+(aboutCurrentSub===d.key?' active':'')+(pendingDelete?' pending-delete':'');
     btn.dataset.sub=d.key;
-    btn.textContent=d.label;
+    btn.title=pendingDelete?'Pending removal — awaiting Main Admin review':'Drag to reorder';
+    btn.innerHTML=esc(d.label)+(pendingDelete?' <i class="ti ti-clock" style="font-size:11px;"></i>':'');
     btn.onclick=()=>showAboutSub(d.key);
-    // Only custom ("+ New page") tabs can be reordered — the built-in
-    // Mission / Conditions / Privacy / Contact tabs stay fixed since the
-    // top nav's "About us" dropdown hardcodes that order. This is what
-    // was missing: previously there was no way to move a newly added
-    // sub-page at all.
-    if(isAdmin && extraKeys.has(d.key)){
+    // Every tab — built-in or custom — can now be dragged to reorder.
+    if(isAdmin){
       btn.draggable=true;
-      btn.title='Drag to reorder';
       btn.style.cursor='grab';
       btn.addEventListener('dragstart', e=>{ aboutTabDragSrc=d.key; btn.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
       btn.addEventListener('dragend', ()=>{ btn.classList.remove('dragging'); bar.querySelectorAll('.aboutus-tab').forEach(b=>b.classList.remove('drag-over')); });
-      btn.addEventListener('dragover', e=>{ e.preventDefault(); if(extraKeys.has(d.key) && d.key!==aboutTabDragSrc) btn.classList.add('drag-over'); });
+      btn.addEventListener('dragover', e=>{ e.preventDefault(); if(d.key!==aboutTabDragSrc) btn.classList.add('drag-over'); });
       btn.addEventListener('dragleave', ()=>{ btn.classList.remove('drag-over'); });
       btn.addEventListener('drop', async e=>{
         e.preventDefault(); btn.classList.remove('drag-over');
@@ -1862,16 +1920,22 @@ function renderAboutTabBar(){
 }
 
 async function reorderAboutTabs(srcKey, tgtKey){
-  const srcIdx=ABOUT_EXTRA_DEFS.findIndex(d=>d.key===srcKey);
-  const tgtIdx=ABOUT_EXTRA_DEFS.findIndex(d=>d.key===tgtKey);
+  // Build a full, de-duplicated key order (in case new tabs were added
+  // since ABOUT_TAB_ORDER was last loaded) before splicing.
+  const allKeys=allAboutDefs().map(d=>d.key);
+  ABOUT_TAB_ORDER=allKeys;
+  const srcIdx=ABOUT_TAB_ORDER.indexOf(srcKey);
+  const tgtIdx=ABOUT_TAB_ORDER.indexOf(tgtKey);
   if(srcIdx===-1||tgtIdx===-1) return;
-  const [moved]=ABOUT_EXTRA_DEFS.splice(srcIdx,1);
-  const newTgtIdx=ABOUT_EXTRA_DEFS.findIndex(d=>d.key===tgtKey);
-  ABOUT_EXTRA_DEFS.splice(newTgtIdx,0,moved);
+  const [moved]=ABOUT_TAB_ORDER.splice(srcIdx,1);
+  const newTgtIdx=ABOUT_TAB_ORDER.indexOf(tgtKey);
+  ABOUT_TAB_ORDER.splice(newTgtIdx,0,moved);
   renderAboutTabBar();
+  // Keep the top-nav "About us ▾" dropdown in sync with the new order too.
+  renderHeaderNav();
   showSaving(true);
-  try{ await saveAboutExtraPagesRegistry(); }
-  catch(err){ console.error(err); showToast('⚠ Could not save new page order.'); }
+  try{ await saveAboutTabOrder(); }
+  catch(err){ console.error(err); showToast('⚠ Could not save page order.'); }
   showSaving(false);
 }
 
@@ -1956,14 +2020,16 @@ window.confirmAddAboutTab=async function(){
   const newDef={key, fsKey, label, defaultTitle:title, defaultBody:'<p>Write content here.</p>'};
   ABOUT_EXTRA_DEFS.push(newDef);
   ABOUT_SUB_CONTENT[key]={title, body:'<p>Write content here.</p>'};
+  if(!ABOUT_TAB_ORDER.includes(key)) ABOUT_TAB_ORDER.push(key);
   showSaving(true);
   try{
     await setDoc(doc(db,'siteContent',fsKey),{title,body:'<p>Write content here.</p>',label},{merge:true});
     // Previously the new tab only existed in memory — nothing recorded
     // *that* this page exists or where it sits in the order, so it
-    // vanished on the next page load. This registry write is what makes
-    // "+ New page" durable.
+    // vanished on the next page load. These two writes are what make
+    // "+ New page" durable across reloads.
     await saveAboutExtraPagesRegistry();
+    await saveAboutTabOrder();
   }
   catch(err){ console.error(err); showToast('⚠ Page created but may not survive a refresh — could not save.'); }
   showSaving(false);
@@ -1984,11 +2050,17 @@ function renderAboutSubPanel(sub){
     document.getElementById('aboutPanelsWrap').appendChild(panel);
   }
   panel.style.display='block';
+  const isCustomPage=!def._isContactSub && ABOUT_EXTRA_DEFS.some(d=>d.key===sub);
+  const pendingDelete=!!def._pendingDeleteReviewId;
   panel.innerHTML=`
     <div style="background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;">
+      ${pendingDelete?`<div style="background:var(--danger-light);color:var(--danger);border-radius:var(--r-md);padding:10px 14px;font-size:12px;margin-bottom:16px;display:flex;align-items:center;gap:6px;"><i class="ti ti-clock"></i> Removal requested — awaiting Main Admin review. This page is hidden from the About us menu until then.</div>`:''}
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;">
         <h2 id="asTitleView_${sub}" style="font-size:20px;font-weight:500;color:var(--text);">${esc(content.title)}</h2>
-        <button class="row-btn" id="asEditBtn_${sub}" style="display:${isAdmin?'flex':'none'};flex-shrink:0;" onclick="enterAboutSubEdit('${sub}')"><i class="ti ti-edit"></i> Edit</button>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button class="row-btn" id="asEditBtn_${sub}" style="display:${isAdmin&&!pendingDelete?'flex':'none'};" onclick="enterAboutSubEdit('${sub}')"><i class="ti ti-edit"></i> Edit</button>
+          ${isCustomPage?`<button class="row-btn del" id="asDeleteBtn_${sub}" style="display:${isAdmin&&!pendingDelete?'flex':'none'};" onclick="openDeleteAboutPageModal('${sub}')"><i class="ti ti-trash"></i> Delete</button>`:''}
+        </div>
       </div>
       <div id="asBodyView_${sub}" class="aboutus-content-view">${content.body}</div>
       <div id="asEditForm_${sub}" style="display:none;margin-top:16px;">
@@ -2188,6 +2260,64 @@ window.saveAboutSub=async function(sub){
     showToast('Saved');
   }catch(err){ console.error(err); showToast('⚠ Could not save. Try again.'); }
   finally{ showSaving(false); }
+};
+
+/* ── Delete a custom ("+ New page") About Us sub-page ──
+   Only custom pages can be deleted this way — Mission / Conditions of
+   use / Privacy Policy / Contact are core pages and aren't offered a
+   delete button. Follows the same staff-vs-Main-Admin pattern used
+   everywhere else in the app (see submitDeleteWithReview): Main Admin
+   deletes immediately and for good; Staff can only request a deletion,
+   which hides the tab from guests right away but leaves it recoverable
+   until Main Admin approves (removes it for real) or rejects (restores
+   it) from the Review queue. */
+let pendingDeleteAboutKey=null;
+
+window.openDeleteAboutPageModal=function(sub){
+  const def=ABOUT_EXTRA_DEFS.find(d=>d.key===sub); if(!def) return;
+  pendingDeleteAboutKey=sub;
+  document.getElementById('deleteSignName').textContent=`"${def.label}"`;
+  document.querySelector('#deleteModal .modal-title span:first-child').textContent='Delete page';
+  document.getElementById('deleteModal').dataset.mode='aboutpage';
+  setDeleteModalNote();
+  document.getElementById('deleteModal').classList.add('show');
+};
+
+window.confirmDeleteAboutPage=async function(){
+  const key=pendingDeleteAboutKey; if(!key) return;
+  const idx=ABOUT_EXTRA_DEFS.findIndex(d=>d.key===key); if(idx===-1) return;
+  const def=ABOUT_EXTRA_DEFS[idx];
+  showSaving(true);
+  try{
+    if(isMainAdmin){
+      // Permanent: drop the content doc, the registry entry, and the
+      // tab's slot in the shared order.
+      await deleteDoc(doc(db,'siteContent',def.fsKey));
+      ABOUT_EXTRA_DEFS.splice(idx,1);
+      await saveAboutExtraPagesRegistry();
+      ABOUT_TAB_ORDER=ABOUT_TAB_ORDER.filter(k=>k!==key);
+      await saveAboutTabOrder();
+      delete ABOUT_SUB_CONTENT[key];
+      document.getElementById('aboutSubPanel_'+key)?.remove();
+    } else {
+      // Soft: file a pendingReview with the page's current content as
+      // the "before" snapshot (so Reject can restore it verbatim), then
+      // flag the registry entry so the tab shows a "pending removal"
+      // badge and is skipped in the nav dropdown until resolved.
+      const fullDocData={title:ABOUT_SUB_CONTENT[key]?.title||def.defaultTitle, body:ABOUT_SUB_CONTENT[key]?.body||def.defaultBody, label:def.label};
+      const reviewId=await createPendingReview('siteContent', def.fsKey, def.label, 'delete', fullDocData, null);
+      def._pendingDeleteReviewId=reviewId;
+      await saveAboutExtraPagesRegistry();
+    }
+    if(aboutCurrentSub===key){ aboutCurrentSub='mission'; }
+    renderAboutTabBar();
+    renderHeaderNav();
+    if(document.body.dataset.aboutSubpage===key){ showAboutSub('mission'); }
+  }catch(err){ console.error(err); showToast('⚠ Could not delete. Try again.'); showSaving(false); return; }
+  showSaving(false);
+  closeDeleteModal();
+  pendingDeleteAboutKey=null;
+  showToast(isMainAdmin?`"${def.label}" deleted`:`"${def.label}" removed — sent to Main Admin for review`);
 };
 
 /* ── Keep legacy about content functions so nothing breaks ── */
@@ -3027,12 +3157,14 @@ window.renderHeaderNav=function(){
       wrap.appendChild(navEl);
       const menu=document.createElement('div');
       menu.className='nav-dropdown-menu';
-      const subItems=[
-        {key:'mission',label:'Mission'},
-        {key:'conditions',label:'Conditions of use'},
-        {key:'privacy',label:'Privacy Policy'}
-      ];
-      subItems.forEach(si=>{
+      // Was hardcoded to just Mission/Conditions/Privacy — Contact and
+      // any custom "+ New page" tabs (e.g. the "A"/"ss" pages from the
+      // screenshot) never showed up here even though they existed as
+      // real tabs on the About Us page. allAboutDefs() is the same
+      // source of truth the tab bar uses, already in the live drag order,
+      // so the dropdown and the tab bar can never drift apart again.
+      allAboutDefs().forEach(si=>{
+        if(si._pendingDeleteReviewId) return; // hide tabs awaiting removal approval
         const it=document.createElement('div');
         it.className='nav-dropdown-item'+(activeSubPage===si.key?' active':'');
         it.textContent=si.label;
@@ -3864,6 +3996,7 @@ window.closeDeleteModal=function(){ document.getElementById('deleteModal').class
 window.confirmDeleteRouter=function(){
   const mode=document.getElementById('deleteModal').dataset.mode;
   if(mode==='handshape') confirmDeleteHandshape();
+  else if(mode==='aboutpage') confirmDeleteAboutPage();
   else confirmDelete();
 };
 window.confirmDelete=async function(){
