@@ -510,9 +510,9 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   .modal-video{width:92vw;}
 
   /* ══ About us sub-nav tabs ══ */
-.aboutus-tab{padding:7px 16px;border-radius:var(--r-md);border:none;background:transparent;font-size:13px;color:var(--text2);cursor:pointer;font-weight:500;}
-.aboutus-tab:hover{background:var(--bg2);color:var(--text);}
-.aboutus-tab.active{background:var(--accent);color:white;}
+.aboutus-tab{padding:9px 18px;border-radius:var(--r-md);border:1.5px solid var(--border2);background:var(--bg);font-size:13px;color:var(--text2);cursor:pointer;font-weight:500;transition:all .15s;}
+.aboutus-tab:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light);}
+.aboutus-tab.active{background:var(--accent);color:white;border-color:var(--accent);font-weight:600;box-shadow:0 2px 8px rgba(26,74,138,0.18);}
 /* ══ Rich text editor toolbar ══ */
 .rte-toolbar{display:flex;flex-wrap:wrap;gap:3px;padding:8px 10px;background:var(--bg2);border:0.5px solid var(--border2);border-bottom:none;border-radius:var(--r-md) var(--r-md) 0 0;}
 .rte-btn{display:flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 6px;border-radius:var(--r-sm);border:0.5px solid transparent;background:transparent;color:var(--text);cursor:pointer;font-size:13px;font-weight:500;}
@@ -794,15 +794,29 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 <div class="page" id="pageAboutUs">
   <div style="max-width:760px;margin:40px auto;padding:0 16px 60px;">
     <!-- Sub-nav tabs -->
-    <div style="display:flex;gap:2px;margin-bottom:24px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:6px;width:fit-content;">
-      <button class="aboutus-tab" data-sub="mission" onclick="showAboutSub('mission')">Mission</button>
-      <button class="aboutus-tab" data-sub="conditions" onclick="showAboutSub('conditions')">Conditions of use</button>
-      <button class="aboutus-tab" data-sub="privacy" onclick="showAboutSub('privacy')">Privacy Policy</button>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:28px;flex-wrap:wrap;">
+      <div id="aboutTabBar" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+      <button id="aboutAddTabBtn" style="display:none;align-items:center;gap:5px;padding:8px 14px;border-radius:var(--r-md);border:1.5px dashed var(--border2);background:transparent;color:var(--text3);font-size:13px;cursor:pointer;" onclick="openAddAboutTabModal()"><i class="ti ti-plus"></i> New page</button>
     </div>
-    <!-- Sub-page panels -->
-    <div id="aboutSubMission" class="aboutus-panel" style="display:none;"></div>
-    <div id="aboutSubConditions" class="aboutus-panel" style="display:none;"></div>
-    <div id="aboutSubPrivacy" class="aboutus-panel" style="display:none;"></div>
+    <!-- Sub-page panels container -->
+    <div id="aboutPanelsWrap"></div>
+    <!-- Legacy placeholder divs (hidden, kept for compatibility) -->
+    <div id="aboutSubMission" style="display:none;"></div>
+    <div id="aboutSubConditions" style="display:none;"></div>
+    <div id="aboutSubPrivacy" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- Add About Tab modal -->
+<div class="modal-overlay" id="addAboutTabModal">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-title"><span>New sub-page</span><button class="modal-close" onclick="closeAddAboutTabModal()"><i class="ti ti-x"></i></button></div>
+    <div style="padding:20px;">
+      <div class="form-field"><label>Page label (shown on tab)</label><input type="text" id="newAboutTabLabel" placeholder="e.g. Team, FAQ..."/></div>
+      <div class="form-field"><label>Initial title</label><input type="text" id="newAboutTabTitle" placeholder="Same as label by default"/></div>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:4px;">The new page will be editable right away using the rich-text editor.</p>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeAddAboutTabModal()">Cancel</button><button class="btn btn-primary" onclick="confirmAddAboutTab()"><i class="ti ti-plus"></i> Create page</button></div>
   </div>
 </div>
 
@@ -1744,19 +1758,87 @@ async function loadAboutSubContent(){
 
 let aboutCurrentSub='mission';
 let aboutEditMode=false;
+let ABOUT_EXTRA_DEFS=[];
+
+function allAboutDefs(){
+  return [
+    ...ABOUT_SUB_DEFS,
+    {key:'contact_sub', fsKey:'aboutContact', label:'Contact', defaultTitle:'Contact', defaultBody:'', _isContactSub:true},
+    ...ABOUT_EXTRA_DEFS
+  ];
+}
+
+function renderAboutTabBar(){
+  const bar=document.getElementById('aboutTabBar'); if(!bar) return;
+  bar.innerHTML='';
+  allAboutDefs().forEach(d=>{
+    const btn=document.createElement('button');
+    btn.className='aboutus-tab'+(aboutCurrentSub===d.key?' active':'');
+    btn.dataset.sub=d.key;
+    btn.textContent=d.label;
+    btn.onclick=()=>showAboutSub(d.key);
+    bar.appendChild(btn);
+  });
+  const addBtn=document.getElementById('aboutAddTabBtn');
+  if(addBtn) addBtn.style.display=isAdmin?'flex':'none';
+}
 
 window.showAboutSub=function(sub){
   aboutCurrentSub=sub;
   document.body.dataset.aboutSubpage=sub;
-  document.querySelectorAll('.aboutus-tab').forEach(t=>t.classList.toggle('active',t.dataset.sub===sub));
-  document.querySelectorAll('.aboutus-panel').forEach(p=>p.style.display='none');
+  renderAboutTabBar();
+  document.querySelectorAll('#aboutPanelsWrap .aboutus-panel').forEach(p=>p.style.display='none');
+  if(sub==='contact_sub'){
+    let panel=document.getElementById('aboutSubPanel_contact_sub');
+    if(!panel){
+      panel=document.createElement('div');
+      panel.id='aboutSubPanel_contact_sub';
+      panel.className='aboutus-panel';
+      panel.innerHTML=renderContactSubPanelHtml();
+      document.getElementById('aboutPanelsWrap').appendChild(panel);
+      setTimeout(()=>{ renderContactView(); },0);
+    }
+    panel.style.display='block';
+    return;
+  }
   const panel=document.getElementById('aboutSubPanel_'+sub);
   if(panel){ panel.style.display='block'; }
   else { renderAboutSubPanel(sub); }
 };
 
+function renderContactSubPanelHtml(){
+  return '<div style="background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;margin-bottom:20px;"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;"><h2 id=\"contactTitleView\" style=\"font-size:20px;font-weight:500;margin-bottom:8px;\">Get in Touch</h2><button class=\"row-btn\" id=\"contactEditBtn\" style=\"display:none;flex-shrink:0;\" onclick=\"enterContactEdit()\"><i class=\"ti ti-edit\"></i> Edit</button></div><div id=\"contactBodyView\" style=\"color:var(--text2);line-height:1.7;white-space:pre-wrap;\">Have a question about SignBiz? Fill in the form below and we'll get back to you.</div><div id=\"contactEditForm\" style=\"display:none;margin-top:12px;\"><div class=\"form-field\"><label>Title</label><input type=\"text\" id=\"contactTitleInput\"/></div><div class=\"form-field\"><label>Body</label><textarea id=\"contactBodyInput\" style=\"min-height:100px;\"></textarea></div><div class=\"form-footer\" style=\"margin-top:6px;\"><button class=\"btn\" onclick=\"cancelContactEdit()\">Cancel</button><button class=\"btn btn-primary\" onclick=\"saveContactContent()\">Save</button></div></div></div><div style=\"background:var(--bg);border-radius:var(--r-lg);border:0.5px solid var(--border);padding:28px 32px;\"><p style=\"font-size:13px;font-weight:600;color:var(--text);margin-bottom:16px;\">Send us a message</p><div class=\"form-field\"><label>Type of enquiry *</label><div style=\"display:flex;flex-direction:column;gap:8px;margin-top:4px;\" id=\"contactTypeGroup\"><label style=\"display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border-radius:var(--r-md);border:1px solid var(--border2);background:var(--bg2);\" id=\"ctype_general\"><input type=\"radio\" name=\"contactType\" value=\"general\" onchange=\"onContactTypeChange()\" style=\"width:auto;height:auto;flex-shrink:0;\"/> <span>General question</span></label><label style=\"display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border-radius:var(--r-md);border:1px solid var(--border2);background:var(--bg2);\" id=\"ctype_student\"><input type=\"radio\" name=\"contactType\" value=\"student\" onchange=\"onContactTypeChange()\" style=\"width:auto;height:auto;flex-shrink:0;\"/> <span>HS student question</span></label><label style=\"display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border-radius:var(--r-md);border:1px solid var(--border2);background:var(--bg2);\" id=\"ctype_teacher\"><input type=\"radio\" name=\"contactType\" value=\"teacher\" onchange=\"onContactTypeChange()\" style=\"width:auto;height:auto;flex-shrink:0;\"/> <span>Teacher / educator</span></label><label style=\"display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border-radius:var(--r-md);border:1px solid var(--border2);background:var(--bg2);\" id=\"ctype_researcher\"><input type=\"radio\" name=\"contactType\" value=\"researcher\" onchange=\"onContactTypeChange()\" style=\"width:auto;height:auto;flex-shrink:0;\"/> <span>Researcher access request</span></label></div></div><div id=\"contactResearcherNotice\" style=\"display:none;background:#faf5ff;border:0.5px solid #c4b5fd;border-radius:var(--r-md);padding:14px;margin:-4px 0 12px;\"><p style=\"font-size:12px;font-weight:600;color:#7c3aed;display:flex;align-items:center;gap:5px;margin-bottom:6px;\"><i class=\"ti ti-microscope\"></i> Researcher access request</p><p style=\"font-size:12px;color:#6d28d9;line-height:1.6;\">Please include your institution, research topic, and intended use of the data.</p></div><div class=\"form-field\"><label>Your name *</label><input type=\"text\" id=\"contactName\" placeholder=\"First and last name\"/></div><div class=\"form-field\" id=\"contactOrgField\" style=\"display:none;\"><label>Organisation / Institution *</label><input type=\"text\" id=\"contactOrg\" placeholder=\"School, university, or organisation name\"/></div><div class=\"form-field\"><label>Email address *</label><input type=\"email\" id=\"contactEmail\" placeholder=\"your@email.com\"/></div><div class=\"form-field\"><label>Message *</label><textarea id=\"contactMessage\" style=\"min-height:140px;\" placeholder=\"Tell us what\'s on your mind...\"></textarea></div><div id=\"contactError\" style=\"display:none;font-size:12px;color:var(--danger);margin-bottom:10px;padding:8px 12px;background:var(--danger-light);border-radius:var(--r-sm);\"></div><div id=\"contactSuccess\" style=\"display:none;font-size:13px;color:var(--success);padding:14px;background:var(--success-light);border-radius:var(--r-md);margin-bottom:10px;line-height:1.6;\"></div><div style=\"display:flex;gap:8px;align-items:center;\"><button class=\"btn btn-primary\" id=\"contactSubmitBtn\" onclick=\"submitContactForm()\"><i class=\"ti ti-send\"></i> Send message</button></div></div>';
+}
+
+window.openAddAboutTabModal=function(){
+  document.getElementById('newAboutTabLabel').value='';
+  document.getElementById('newAboutTabTitle').value='';
+  document.getElementById('addAboutTabModal').classList.add('show');
+};
+window.closeAddAboutTabModal=function(){
+  document.getElementById('addAboutTabModal').classList.remove('show');
+};
+window.confirmAddAboutTab=async function(){
+  const label=document.getElementById('newAboutTabLabel').value.trim();
+  if(!label){ showToast('Please enter a tab label.'); return; }
+  const title=document.getElementById('newAboutTabTitle').value.trim()||label;
+  const key='custom_'+label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+  const fsKey='aboutCustom_'+key;
+  if(ABOUT_EXTRA_DEFS.some(d=>d.key===key)){ showToast('A tab with that name already exists.'); return; }
+  const newDef={key, fsKey, label, defaultTitle:title, defaultBody:'<p>Write content here.</p>'};
+  ABOUT_EXTRA_DEFS.push(newDef);
+  ABOUT_SUB_CONTENT[key]={title, body:'<p>Write content here.</p>'};
+  showSaving(true);
+  try{ await setDoc(doc(db,'siteContent',fsKey),{title,body:'<p>Write content here.</p>',label},{merge:true}); }
+  catch(err){ console.error(err); }
+  showSaving(false);
+  closeAddAboutTabModal();
+  showAboutSub(key);
+  showToast('"'+label+'" page created');
+};
+
 function renderAboutSubPanel(sub){
-  const def=ABOUT_SUB_DEFS.find(d=>d.key===sub); if(!def) return;
+  const def=allAboutDefs().find(d=>d.key===sub); if(!def) return;
   const content=ABOUT_SUB_CONTENT[sub];
   const containerId='aboutSubPanel_'+sub;
   let panel=document.getElementById(containerId);
@@ -1764,11 +1846,7 @@ function renderAboutSubPanel(sub){
     panel=document.createElement('div');
     panel.id=containerId;
     panel.className='aboutus-panel';
-    document.getElementById('aboutSubMission').parentNode.appendChild(panel);
-    // hide the placeholder divs we no longer use
-    ['aboutSubMission','aboutSubConditions','aboutSubPrivacy'].forEach(id=>{
-      const el=document.getElementById(id); if(el) el.style.display='none';
-    });
+    document.getElementById('aboutPanelsWrap').appendChild(panel);
   }
   panel.style.display='block';
   panel.innerHTML=`
@@ -1798,7 +1876,7 @@ function renderAboutSubPanel(sub){
 
 function buildRteToolbar(sub){
   return `<div class="rte-toolbar" id="rteToolbar_${sub}">
-    <select class="rte-select" id="rteHeading_${sub}" onchange="rteExec('${sub}','formatBlock',this.value)">
+    <select class="rte-select" id="rteHeading_${sub}" onchange="rteExec('${sub}','formatBlock','<'+this.value+'>')">
       <option value="p">Paragraph</option>
       <option value="h1">Heading 1</option>
       <option value="h2">Heading 2</option>
@@ -2005,6 +2083,7 @@ onAuthStateChanged(auth, async user=>{
   rerenderActiveLandingSurface();
   renderHeaderNav();
   // Refresh About Us edit buttons visibility
+  renderAboutTabBar();
   ABOUT_SUB_DEFS.forEach(d=>{
     const btn=document.getElementById('asEditBtn_'+d.key);
     if(btn) btn.style.display=isAdmin?'flex':'none';
@@ -2643,7 +2722,7 @@ const NAV_FIXED_DEFS={
   topics:  {label:'Topics',     page:'topics'},
   dict:    {label:'Dictionary', page:'dict'},
   aboutus: {label:'About us',   page:'aboutus', hasDropdown:true},
-  contact: {label:'Contact',    page:'contact'}
+  contact: {label:'Contact',    page:'aboutus', contactSub:true}
 };
 // Keep legacy 'about' key in saved navOrder working by aliasing it
 const NAV_KEY_ALIAS={'about':'aboutus'};
@@ -2703,7 +2782,7 @@ window.renderHeaderNav=function(){
   if(mgBtn) mgBtn.innerHTML=navManageMode?'<i class="ti ti-check"></i> Done':'<i class="ti ti-arrows-move"></i> Manage nav';
 
   const currentActive = document.querySelector('.page.active')?.id;
-  const activePage = (currentActive==='pageTopics'||currentActive==='pageCategoryOptions') ? 'topics' : currentActive==='pageDict'?'dict' : currentActive==='pageAboutUs'?'aboutus' : currentActive==='pageContact'?'contact' : '';
+  const activePage = (currentActive==='pageTopics'||currentActive==='pageCategoryOptions') ? 'topics' : currentActive==='pageDict'?'dict' : (currentActive==='pageAboutUs'||currentActive==='pageContact')?'aboutus' : '';
   const activeSubPage = document.body.dataset.aboutSubpage||'';
   const activeFieldId = currentActive==='pageCategoryOptions' ? activeCatOptFieldId : null;
 
@@ -2760,7 +2839,7 @@ window.renderHeaderNav=function(){
       });
     } else {
       el.textContent=item.label;
-      el.onclick = item.type==='custom' ? ()=>goToCategoryOptions(item.fieldId) : ()=>showPage(item.page);
+      el.onclick = item.type==='custom' ? ()=>goToCategoryOptions(item.fieldId) : item.contactSub ? ()=>showPage('aboutus','contact_sub') : ()=>showPage(item.page);
     }
     nav.appendChild(el);
   });
@@ -4375,6 +4454,7 @@ async function init(){
   buildFilterPanel(); buildFilterTags(); buildHsGrid(); doFilter();
   // Pre-render first About Us sub-panel so it's ready
   document.body.dataset.aboutSubpage='mission';
+  renderAboutTabBar();
   showPage('topics');
 }
 
