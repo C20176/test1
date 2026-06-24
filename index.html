@@ -513,6 +513,8 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .aboutus-tab{padding:9px 18px;border-radius:var(--r-md);border:1.5px solid var(--border2);background:var(--bg);font-size:13px;color:var(--text2);cursor:pointer;font-weight:500;transition:all .15s;}
 .aboutus-tab:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light);}
 .aboutus-tab.active{background:var(--accent);color:white;border-color:var(--accent);font-weight:600;box-shadow:0 2px 8px rgba(26,74,138,0.18);}
+.aboutus-tab.dragging{opacity:0.4;}
+.aboutus-tab.drag-over{box-shadow:0 0 0 2px var(--accent);}
 /* ══ Rich text editor toolbar ══ */
 .rte-toolbar{display:flex;flex-wrap:wrap;gap:3px;padding:8px 10px;background:var(--bg2);border:0.5px solid var(--border2);border-bottom:none;border-radius:var(--r-md) var(--r-md) 0 0;}
 .rte-btn{display:flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 6px;border-radius:var(--r-sm);border:0.5px solid transparent;background:transparent;color:var(--text);cursor:pointer;font-size:13px;font-weight:500;}
@@ -526,6 +528,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .rte-editor:focus{border-color:var(--accent);}
 .rte-editor a{color:var(--accent);text-decoration:underline;}
 .rte-editor blockquote{border-left:3px solid var(--accent);margin:8px 0;padding:4px 12px;color:var(--text2);}
+.rte-editor img,.aboutus-content-view img{max-width:100%;border-radius:var(--r-sm);display:block;margin:8px 0;}
 .aboutus-content-view{font-size:14px;line-height:1.75;color:var(--text2);}
 .aboutus-content-view h1,.aboutus-content-view h2,.aboutus-content-view h3{color:var(--text);margin:1em 0 0.4em;}
 .aboutus-content-view a{color:var(--accent);text-decoration:underline;}
@@ -817,6 +820,24 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
       <p style="font-size:12px;color:var(--text3);margin-bottom:4px;">The new page will be editable right away using the rich-text editor.</p>
     </div>
     <div class="modal-footer"><button class="btn" onclick="closeAddAboutTabModal()">Cancel</button><button class="btn btn-primary" onclick="confirmAddAboutTab()"><i class="ti ti-plus"></i> Create page</button></div>
+  </div>
+</div>
+
+<!-- Insert Image modal (rich text editor) -->
+<div class="modal-overlay" id="rteImageModal">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-title"><span>Insert image</span><button class="modal-close" onclick="closeRteImageModal()"><i class="ti ti-x"></i></button></div>
+    <div style="padding:20px;">
+      <div class="form-field">
+        <label>Choose image file (max 1MB)</label>
+        <input type="file" id="rteImageFileInput" accept="image/*" onchange="onRteImageFileChosen()"/>
+      </div>
+      <p id="rteImageError" style="display:none;font-size:12px;color:var(--danger);margin-top:4px;"></p>
+      <div id="rteImagePreviewWrap" style="display:none;margin-top:12px;">
+        <img id="rteImagePreview" style="max-width:100%;max-height:200px;border-radius:var(--r-md);border:0.5px solid var(--border2);"/>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeRteImageModal()">Cancel</button><button class="btn btn-primary" id="rteImageInsertBtn" onclick="confirmRteImageInsert()" disabled><i class="ti ti-photo"></i> Insert</button></div>
   </div>
 </div>
 
@@ -1754,6 +1775,41 @@ async function loadAboutSubContent(){
       }
     }catch(err){ console.error('loadAboutSubContent failed for '+d.key,err); }
   }
+  await loadAboutExtraPages();
+}
+
+// Custom "+ New page" sub-pages previously lived ONLY in the in-memory
+// ABOUT_EXTRA_DEFS array — there was no registry doc, so on every page
+// reload the tab (and its order) vanished, even though its content was
+// saved at siteContent/aboutCustom_* once saveAboutSub was fixed to find
+// it. This registry doc is the source of truth for which custom pages
+// exist and what order they're in.
+async function loadAboutExtraPages(){
+  ABOUT_EXTRA_DEFS=[];
+  try{
+    const snap=await getDoc(doc(db,'siteContent','aboutExtraPages'));
+    if(snap.exists() && Array.isArray(snap.data().pages)){
+      for(const p of snap.data().pages){
+        if(!p.key||!p.fsKey) continue;
+        const def={key:p.key, fsKey:p.fsKey, label:p.label||p.key, defaultTitle:p.label||p.key, defaultBody:'<p>Write content here.</p>'};
+        ABOUT_EXTRA_DEFS.push(def);
+        ABOUT_SUB_CONTENT[def.key]={title:def.defaultTitle, body:def.defaultBody};
+        try{
+          const pageSnap=await getDoc(doc(db,'siteContent',def.fsKey));
+          if(pageSnap.exists()){
+            const data=pageSnap.data();
+            if(data.title) ABOUT_SUB_CONTENT[def.key].title=data.title;
+            if(data.body)  ABOUT_SUB_CONTENT[def.key].body=data.body;
+          }
+        }catch(err){ console.error('load custom about page failed for '+def.key,err); }
+      }
+    }
+  }catch(err){ console.error('loadAboutExtraPages failed:',err); }
+}
+
+async function saveAboutExtraPagesRegistry(){
+  const pages=ABOUT_EXTRA_DEFS.map(d=>({key:d.key, fsKey:d.fsKey, label:d.label}));
+  await setDoc(doc(db,'siteContent','aboutExtraPages'),{pages});
 }
 
 let aboutCurrentSub='mission';
@@ -1768,19 +1824,55 @@ function allAboutDefs(){
   ];
 }
 
+let aboutTabDragSrc=null;
+
 function renderAboutTabBar(){
   const bar=document.getElementById('aboutTabBar'); if(!bar) return;
   bar.innerHTML='';
+  const extraKeys=new Set(ABOUT_EXTRA_DEFS.map(d=>d.key));
   allAboutDefs().forEach(d=>{
     const btn=document.createElement('button');
     btn.className='aboutus-tab'+(aboutCurrentSub===d.key?' active':'');
     btn.dataset.sub=d.key;
     btn.textContent=d.label;
     btn.onclick=()=>showAboutSub(d.key);
+    // Only custom ("+ New page") tabs can be reordered — the built-in
+    // Mission / Conditions / Privacy / Contact tabs stay fixed since the
+    // top nav's "About us" dropdown hardcodes that order. This is what
+    // was missing: previously there was no way to move a newly added
+    // sub-page at all.
+    if(isAdmin && extraKeys.has(d.key)){
+      btn.draggable=true;
+      btn.title='Drag to reorder';
+      btn.style.cursor='grab';
+      btn.addEventListener('dragstart', e=>{ aboutTabDragSrc=d.key; btn.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+      btn.addEventListener('dragend', ()=>{ btn.classList.remove('dragging'); bar.querySelectorAll('.aboutus-tab').forEach(b=>b.classList.remove('drag-over')); });
+      btn.addEventListener('dragover', e=>{ e.preventDefault(); if(extraKeys.has(d.key) && d.key!==aboutTabDragSrc) btn.classList.add('drag-over'); });
+      btn.addEventListener('dragleave', ()=>{ btn.classList.remove('drag-over'); });
+      btn.addEventListener('drop', async e=>{
+        e.preventDefault(); btn.classList.remove('drag-over');
+        if(!aboutTabDragSrc || aboutTabDragSrc===d.key) return;
+        await reorderAboutTabs(aboutTabDragSrc, d.key);
+      });
+    }
     bar.appendChild(btn);
   });
   const addBtn=document.getElementById('aboutAddTabBtn');
   if(addBtn) addBtn.style.display=isAdmin?'flex':'none';
+}
+
+async function reorderAboutTabs(srcKey, tgtKey){
+  const srcIdx=ABOUT_EXTRA_DEFS.findIndex(d=>d.key===srcKey);
+  const tgtIdx=ABOUT_EXTRA_DEFS.findIndex(d=>d.key===tgtKey);
+  if(srcIdx===-1||tgtIdx===-1) return;
+  const [moved]=ABOUT_EXTRA_DEFS.splice(srcIdx,1);
+  const newTgtIdx=ABOUT_EXTRA_DEFS.findIndex(d=>d.key===tgtKey);
+  ABOUT_EXTRA_DEFS.splice(newTgtIdx,0,moved);
+  renderAboutTabBar();
+  showSaving(true);
+  try{ await saveAboutExtraPagesRegistry(); }
+  catch(err){ console.error(err); showToast('⚠ Could not save new page order.'); }
+  showSaving(false);
 }
 
 window.showAboutSub=function(sub){
@@ -1865,8 +1957,15 @@ window.confirmAddAboutTab=async function(){
   ABOUT_EXTRA_DEFS.push(newDef);
   ABOUT_SUB_CONTENT[key]={title, body:'<p>Write content here.</p>'};
   showSaving(true);
-  try{ await setDoc(doc(db,'siteContent',fsKey),{title,body:'<p>Write content here.</p>',label},{merge:true}); }
-  catch(err){ console.error(err); }
+  try{
+    await setDoc(doc(db,'siteContent',fsKey),{title,body:'<p>Write content here.</p>',label},{merge:true});
+    // Previously the new tab only existed in memory — nothing recorded
+    // *that* this page exists or where it sits in the order, so it
+    // vanished on the next page load. This registry write is what makes
+    // "+ New page" durable.
+    await saveAboutExtraPagesRegistry();
+  }
+  catch(err){ console.error(err); showToast('⚠ Page created but may not survive a refresh — could not save.'); }
   showSaving(false);
   closeAddAboutTabModal();
   showAboutSub(key);
@@ -1911,6 +2010,8 @@ function renderAboutSubPanel(sub){
 }
 
 function buildRteToolbar(sub){
+  // Order follows the standard rich-text-editor convention:
+  // Headings → Text formatting → Lists → Content (link/image) → Layout (quote/hr) → Editing (undo/redo)
   return `<div class="rte-toolbar" id="rteToolbar_${sub}">
     <select class="rte-select" id="rteHeading_${sub}" onchange="rteExec('${sub}','formatBlock','<'+this.value+'>')">
       <option value="p">Paragraph</option>
@@ -1922,19 +2023,19 @@ function buildRteToolbar(sub){
     <button class="rte-btn" title="Bold" onclick="rteExec('${sub}','bold')"><strong>B</strong></button>
     <button class="rte-btn" title="Italic" onclick="rteExec('${sub}','italic')"><em>I</em></button>
     <button class="rte-btn" title="Underline" onclick="rteExec('${sub}','underline')"><u>U</u></button>
-    <div class="rte-sep"></div>
-    <button class="rte-btn" title="Align left" onclick="rteExec('${sub}','justifyLeft')"><i class="ti ti-align-left"></i></button>
-    <button class="rte-btn" title="Align centre" onclick="rteExec('${sub}','justifyCenter')"><i class="ti ti-align-center"></i></button>
-    <button class="rte-btn" title="Align right" onclick="rteExec('${sub}','justifyRight')"><i class="ti ti-align-right"></i></button>
+    <button class="rte-btn rte-color-btn" title="Text colour"><i class="ti ti-letter-a" style="text-decoration:underline;"></i><input type="color" id="rteColor_${sub}" value="#1a1a18" oninput="rteExec('${sub}','foreColor',this.value)"/></button>
     <div class="rte-sep"></div>
     <button class="rte-btn" title="Bullet list" onclick="rteExec('${sub}','insertUnorderedList')"><i class="ti ti-list"></i></button>
     <button class="rte-btn" title="Numbered list" onclick="rteExec('${sub}','insertOrderedList')"><i class="ti ti-list-numbers"></i></button>
-    <button class="rte-btn" title="Blockquote" onclick="rteBlockquote('${sub}')"><i class="ti ti-quote"></i></button>
-    <div class="rte-sep"></div>
-    <button class="rte-btn rte-color-btn" title="Text colour"><i class="ti ti-letter-a" style="text-decoration:underline;"></i><input type="color" id="rteColor_${sub}" value="#1a1a18" oninput="rteExec('${sub}','foreColor',this.value)"/></button>
     <div class="rte-sep"></div>
     <button class="rte-btn" title="Insert link" onclick="rteInsertLink('${sub}')"><i class="ti ti-link"></i></button>
-    <button class="rte-btn" title="Remove link" onclick="rteExec('${sub}','unlink')"><i class="ti ti-link-off"></i></button>
+    <button class="rte-btn" title="Insert image" onclick="openRteImageModal('${sub}')"><i class="ti ti-photo"></i></button>
+    <div class="rte-sep"></div>
+    <button class="rte-btn" title="Blockquote" onclick="rteBlockquote('${sub}')"><i class="ti ti-quote"></i></button>
+    <button class="rte-btn" title="Horizontal rule" onclick="rteExec('${sub}','insertHorizontalRule')"><i class="ti ti-minus"></i></button>
+    <div class="rte-sep"></div>
+    <button class="rte-btn" title="Undo" onclick="rteExec('${sub}','undo')"><i class="ti ti-arrow-back-up"></i></button>
+    <button class="rte-btn" title="Redo" onclick="rteExec('${sub}','redo')"><i class="ti ti-arrow-forward-up"></i></button>
   </div>`;
 }
 
@@ -1944,7 +2045,13 @@ function bindRteToolbar(sub){
   const editor=document.getElementById('asRteBody_'+sub);
   if(!toolbar||!editor) return;
   toolbar.addEventListener('mousedown',e=>{
-    if(e.target.closest('input[type=color]')) return; // allow colour picker focus
+    // Allow the colour-picker input AND the heading <select> to receive
+    // their own native click/focus behaviour. Previously only the colour
+    // input was excluded, which made preventDefault() fire on the select
+    // too — in most browsers that blocks the dropdown from ever opening,
+    // which was the "Paragraph dropdown doesn't work" bug.
+    if(e.target.closest('input[type=color]')) return;
+    if(e.target.tagName==='SELECT' || e.target.closest('select')) return;
     e.preventDefault(); // prevent editor losing selection
   });
 }
@@ -1973,6 +2080,77 @@ window.rteInsertLink=function(sub){
   }
 };
 
+/* ── Insert image (rich text editor) ──
+   Images are embedded as base64 data-URIs directly in the saved HTML,
+   the same approach already used for handshape images — Firebase Storage
+   isn't used here since the free Spark plan no longer includes Cloud
+   Storage access (it requires the paid Blaze plan as of Oct 2025). Kept
+   under 1MB per image keeps each siteContent doc comfortably inside
+   Firestore's 1MB-per-document limit. */
+let rteImageTargetSub=null;
+let rteImageSavedRange=null;
+let rteImagePendingDataUrl=null;
+const RTE_IMAGE_MAX_BYTES=1024*1024; // 1MB
+
+window.openRteImageModal=function(sub){
+  rteImageTargetSub=sub;
+  // Save the current cursor position in the editor so we can restore it
+  // after the modal (and its file picker) steals focus.
+  const ed=document.getElementById('asRteBody_'+sub);
+  const sel=window.getSelection();
+  rteImageSavedRange = (sel && sel.rangeCount && ed && ed.contains(sel.anchorNode)) ? sel.getRangeAt(0).cloneRange() : null;
+  document.getElementById('rteImageFileInput').value='';
+  document.getElementById('rteImageError').style.display='none';
+  document.getElementById('rteImagePreviewWrap').style.display='none';
+  document.getElementById('rteImageInsertBtn').disabled=true;
+  rteImagePendingDataUrl=null;
+  document.getElementById('rteImageModal').classList.add('show');
+};
+window.closeRteImageModal=function(){
+  document.getElementById('rteImageModal').classList.remove('show');
+};
+window.onRteImageFileChosen=async function(){
+  const inp=document.getElementById('rteImageFileInput');
+  const errEl=document.getElementById('rteImageError');
+  const f=inp.files[0];
+  errEl.style.display='none';
+  document.getElementById('rteImagePreviewWrap').style.display='none';
+  document.getElementById('rteImageInsertBtn').disabled=true;
+  rteImagePendingDataUrl=null;
+  if(!f) return;
+  if(f.size>RTE_IMAGE_MAX_BYTES){
+    errEl.textContent=`That file is ${(f.size/1024/1024).toFixed(2)}MB — please choose an image under 1MB.`;
+    errEl.style.display='block';
+    inp.value='';
+    return;
+  }
+  const dataUrl=await fileToB64(f);
+  rteImagePendingDataUrl=dataUrl;
+  const previewImg=document.getElementById('rteImagePreview');
+  previewImg.src=dataUrl;
+  document.getElementById('rteImagePreviewWrap').style.display='block';
+  document.getElementById('rteImageInsertBtn').disabled=false;
+};
+window.confirmRteImageInsert=function(){
+  const sub=rteImageTargetSub;
+  if(!sub||!rteImagePendingDataUrl) return;
+  const ed=document.getElementById('asRteBody_'+sub); if(!ed) return;
+  ed.focus();
+  const sel=window.getSelection();
+  if(rteImageSavedRange){
+    sel.removeAllRanges();
+    sel.addRange(rteImageSavedRange);
+  }
+  document.execCommand('insertImage', false, rteImagePendingDataUrl);
+  // execCommand inserts a bare <img> — give it a sane max-width so large
+  // images don't overflow the editor or the published page.
+  ed.querySelectorAll('img:not([data-rte-sized])').forEach(img=>{
+    img.style.maxWidth='100%';
+    img.dataset.rteSized='1';
+  });
+  closeRteImageModal();
+};
+
 window.enterAboutSubEdit=function(sub){
   const ed=document.getElementById('asRteBody_'+sub);
   if(ed) ed.innerHTML=ABOUT_SUB_CONTENT[sub].body;
@@ -1991,7 +2169,12 @@ window.cancelAboutSubEdit=function(sub){
 };
 
 window.saveAboutSub=async function(sub){
-  const def=ABOUT_SUB_DEFS.find(d=>d.key===sub); if(!def) return;
+  // Was: ABOUT_SUB_DEFS.find(...) — that array only holds the 3 built-in
+  // pages (mission/conditions/privacy). Saving a page created via
+  // "+ New page" (stored in ABOUT_EXTRA_DEFS) looked up nothing here,
+  // silently `return`ed, and the Save button did nothing — no Firestore
+  // write, no toast, no error. Using allAboutDefs() covers both.
+  const def=allAboutDefs().find(d=>d.key===sub); if(!def) return;
   const title=document.getElementById('asTitleInput_'+sub).value.trim()||def.defaultTitle;
   const body=document.getElementById('asRteBody_'+sub).innerHTML;
   showSaving(true);
@@ -2001,6 +2184,7 @@ window.saveAboutSub=async function(sub){
     document.getElementById('asTitleView_'+sub).textContent=title;
     document.getElementById('asBodyView_'+sub).innerHTML=body;
     cancelAboutSubEdit(sub);
+    renderAboutTabBar();
     showToast('Saved');
   }catch(err){ console.error(err); showToast('⚠ Could not save. Try again.'); }
   finally{ showSaving(false); }
@@ -2757,12 +2941,15 @@ window.saveTopicsHeroContent=async function(){
 const NAV_FIXED_DEFS={
   topics:  {label:'Topics',     page:'topics'},
   dict:    {label:'Dictionary', page:'dict'},
-  aboutus: {label:'About us',   page:'aboutus', hasDropdown:true},
-  contact: {label:'Contact',    page:'aboutus', contactSub:true}
+  aboutus: {label:'About us',   page:'aboutus', hasDropdown:true}
+  // 'contact' removed as a standalone top-level nav item — Contact already
+  // lives as a tab inside the "About us" dropdown, so a separate top-level
+  // link was redundant. Kept out of NAV_FIXED_DEFS entirely (not just
+  // unlisted) so navRenderList() can't resurrect it.
 };
 // Keep legacy 'about' key in saved navOrder working by aliasing it
 const NAV_KEY_ALIAS={'about':'aboutus'};
-let NAV_ORDER=[ {type:'fixed',key:'topics'}, {type:'fixed',key:'dict'}, {type:'fixed',key:'aboutus'}, {type:'fixed',key:'contact'} ];
+let NAV_ORDER=[ {type:'fixed',key:'topics'}, {type:'fixed',key:'dict'}, {type:'fixed',key:'aboutus'} ];
 let navManageMode=false;
 let activeCatOptFieldId=null; // which custom category's options page is currently shown, if any
 let DICT_CONTEXT=null; // {title, backLabel, backAction} when Dictionary was entered via a Topic/category-option card; null = plain "All signs" view, no Back button
@@ -2773,9 +2960,11 @@ async function loadNavOrder(){
     const snap=await getDoc(doc(db,'siteContent','navOrder'));
     if(snap.exists() && Array.isArray(snap.data().items) && snap.data().items.length){
       const saved=snap.data().items;
-      // Ensure every fixed key (including newly added ones like 'contact') is
-      // present even if the saved navOrder pre-dates it. New keys are appended
-      // at the end so existing ordering is preserved.
+      // Ensure every fixed key is present even if the saved navOrder
+      // pre-dates it. New keys are appended at the end so existing
+      // ordering is preserved. (Any stale 'contact' entry from a
+      // previously-saved navOrder is harmless — navRenderList() below
+      // skips fixed entries that no longer have a NAV_FIXED_DEFS match.)
       const savedKeys=new Set(saved.filter(e=>e.type==='fixed').map(e=>e.key));
       // Migrate legacy 'about' key to 'aboutus'
       const migrated=saved.map(e=>e.type==='fixed'&&e.key==='about'?{...e,key:'aboutus'}:e);
