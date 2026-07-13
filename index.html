@@ -766,7 +766,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
   <div class="admin-tab-panel" id="apReview">
     <div class="fb-admin-wrap">
       <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">Edits and deletions made by staff admins, awaiting your review. Guests already see the live result — approving just clears the flag (or finalizes the delete); rejecting rolls it back to the version shown below.</p>
-      <button class="btn" onclick="renderPendingReviewsAdmin()" style="margin-bottom:12px;"><i class="ti ti-refresh"></i> Refresh</button>
+      <button class="btn" onclick="loadPendingReviews().then(renderPendingReviewsAdmin)" style="margin-bottom:12px;"><i class="ti ti-refresh"></i> Refresh</button>
       <div id="reviewAdminList"><p style="color:var(--text3);font-size:13px;">Loading…</p></div>
     </div>
   </div>
@@ -1326,7 +1326,9 @@ async function uploadParsedSignData(parsed, fileName){
    approve (keep) or reject (roll back). Hard deletes by staff are
    soft (sets _hidden:true) until Main Admin approves the real delete.
 ══════════════════════════════════════ */
-let PENDING_REVIEWS=[]; // cached after loadPendingReviews(), main-admin only
+let PENDING_REVIEWS=[]; // cached; kept live via a realtime listener while Main Admin is signed in
+let pendingReviewsUnsub=null; // unsubscribe fn for that listener (see subscribePendingReviews)
+let pendingReviewsLoaded=false; // true once the listener's first snapshot has actually arrived
 
 async function createPendingReview(colName, docId, docLabel, action, snapshotBefore, snapshotAfter){
   const ref = await addDoc(collection(db,'pendingReviews'),{
@@ -1369,12 +1371,47 @@ async function submitDeleteWithReview(colName, docId, docLabel, fullDocData){
   return reviewId;
 }
 
+// One-shot fetch — kept around as the manual "Refresh" button's fallback
+// (and for any caller that needs a guaranteed-fresh read right now).
+// Day-to-day updates come from the realtime listener below instead, so this
+// generally does NOT need to be called after every review action anymore.
 async function loadPendingReviews(){
   try{
     const snap = await getDocs(query(collection(db,'pendingReviews'), orderBy('ts','desc')));
     PENDING_REVIEWS = snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.status==='pending');
+    pendingReviewsLoaded = true;
   }catch(err){ console.error('loadPendingReviews failed:',err); PENDING_REVIEWS=[]; }
   return PENDING_REVIEWS;
+}
+
+// Keeps PENDING_REVIEWS (and the review-count badge / open review tab) live
+// for Main Admin, without polling. This is deliberately NOT the pattern used
+// for public data like signs/categories (see loadAll(), which stays one-shot
+// getDocs()): pendingReviews is small, admin-only, and only ever has one
+// reader class (Main Admin), so a persistent listener costs at most a
+// handful of extra reads per staff edit/delete — nothing like the traffic-
+// multiplying cost a listener on a public, visitor-facing collection would have.
+function subscribePendingReviews(){
+  if(pendingReviewsUnsub) return; // already subscribed, avoid double-listening
+  const q = query(collection(db,'pendingReviews'), where('status','==','pending'), orderBy('ts','desc'));
+  pendingReviewsUnsub = onSnapshot(q, snap=>{
+    PENDING_REVIEWS = snap.docs.map(d=>({id:d.id,...d.data()}));
+    pendingReviewsLoaded = true;
+    renderReviewBadgeFromCache();
+    // Only re-render the review list itself if it's actually the visible tab —
+    // no point rebuilding hidden DOM on every push.
+    if(document.getElementById('pageAdmin')?.classList.contains('active') &&
+       document.getElementById('apReview')?.classList.contains('active')){
+      renderPendingReviewsAdmin();
+    }
+  }, err=>{ console.error('pendingReviews listener failed:',err); });
+}
+// Tears the listener down (on logout, or losing Main Admin status) so it
+// doesn't keep billing reads against a session nobody's using anymore.
+function unsubscribePendingReviews(){
+  if(pendingReviewsUnsub){ pendingReviewsUnsub(); pendingReviewsUnsub=null; }
+  PENDING_REVIEWS=[];
+  pendingReviewsLoaded=false;
 }
 
 // Main Admin approves a staff edit/delete: the change stands as-is.
@@ -1444,26 +1481,33 @@ async function clearAboutPagePendingDelete(fsKey){
 async function refreshAfterReviewAction(){
   await loadAll();
   await loadAboutSubContent();
-  await loadPendingReviews();
+  // No loadPendingReviews() here anymore — approveReview/rejectReview's own
+  // writes to pendingReviews land through the realtime listener (see
+  // subscribePendingReviews) a moment later and update PENDING_REVIEWS,
+  // the badge, and the open review tab on their own.
   buildFilterPanel(); buildFilterTags(); buildHsGrid(); doFilter();
   rerenderActiveLandingSurface();
   renderHeaderNav();
   renderAboutTabBar();
   if(document.getElementById('pageAdmin').classList.contains('active')){
     renderAdminTable();
-    if(document.getElementById('apReview')?.classList.contains('active')) renderPendingReviewsAdmin();
   }
-  refreshReviewBadge();
 };
 
-async function refreshReviewBadge(){
+// Pure render from whatever's currently cached in PENDING_REVIEWS — no
+// network call. The realtime listener (subscribePendingReviews) is what
+// keeps that cache fresh; this just reflects it into the badge DOM.
+function renderReviewBadgeFromCache(){
   if(!isMainAdmin) return;
-  await loadPendingReviews();
   const badge=document.getElementById('reviewCountBadge');
   if(!badge) return;
   if(PENDING_REVIEWS.length){ badge.textContent=PENDING_REVIEWS.length; badge.style.display='inline'; }
   else { badge.style.display='none'; }
 }
+// Kept as a thin alias so existing call sites (login, showPage('admin'), etc.)
+// don't need to change — it now just re-renders from cache instead of doing
+// its own getDocs(), since subscribePendingReviews() keeps the cache live.
+function refreshReviewBadge(){ renderReviewBadgeFromCache(); }
 
 /* ══ FEEDBACK / CONTACTS UNREAD BADGES (per-admin read state) ══
    An item counts as unread for THIS admin if it arrived after their
@@ -1591,12 +1635,14 @@ window.loadReviewVideo=function(cellId, ytId){
   el.innerHTML=`<iframe src="https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0" allow="autoplay;encrypted-media;picture-in-picture" allowfullscreen></iframe>`;
 };
 
-window.renderPendingReviewsAdmin=async function(){
+// Pure render from PENDING_REVIEWS — no fetch. Kept live by the
+// subscribePendingReviews() listener, so switching to this tab (or the
+// listener pushing an update) both just call this directly now.
+window.renderPendingReviewsAdmin=function(){
   const el=document.getElementById('reviewAdminList');
-  if(el) el.innerHTML='<p style="color:var(--text3);font-size:13px;">Loading…</p>';
-  await loadPendingReviews();
-  refreshReviewBadge();
+  renderReviewBadgeFromCache();
   if(!el) return;
+  if(!pendingReviewsLoaded){ el.innerHTML='<p style="color:var(--text3);font-size:13px;">Loading…</p>'; return; }
   if(!PENDING_REVIEWS.length){ el.innerHTML='<p style="color:var(--text3);font-size:13px;">Nothing pending — all clear.</p>'; return; }
   el.innerHTML=PENDING_REVIEWS.map(r=>{
     const date=r.ts?new Date(r.ts).toLocaleString():'';
@@ -2431,6 +2477,10 @@ onAuthStateChanged(auth, async user=>{
   isMainAdmin = !!adminData && adminData.role==='main';
   isResearcher = !!adminData && adminData.role==='researcher';
   adminName = adminData?.name || user?.displayName || user?.email || '';
+  // Only Main Admin ever reads pendingReviews (see firestore.rules), so only
+  // Main Admin gets the realtime listener — everyone else stays unsubscribed,
+  // and logging out (or losing Main Admin status) tears it down immediately.
+  if(isMainAdmin) subscribePendingReviews(); else unsubscribePendingReviews();
   adminReadState = {
     lastSeenFeedbackTs: adminData?.lastSeenFeedbackTs || 0,
     lastSeenContactsTs: adminData?.lastSeenContactsTs || 0,
