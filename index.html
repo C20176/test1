@@ -1678,7 +1678,11 @@ async function loadAll(){
   [WORDS, CATEGORIES, TOPICS, DIFFICULTIES, SPECIAL_TAGS, HANDSHAPES, CUSTOM_FIELDS, CUSTOM_OPTIONS] =
     await Promise.all(['signs','categories','topics','difficulties','tags','handshapes','customFields','customFieldOptions'].map(loadCollection));
 
-  SIGN_DATA = await loadSignData();
+  // SIGN_DATA (ELAN annotations) is NOT loaded here. It's consent-restricted
+  // research data — Firestore rules only allow admins/researchers to read it
+  // — so it's fetched from onAuthStateChanged() instead, once we actually
+  // know the signed-in user qualifies. Loading it here would just be a
+  // permission-denied no-op for every ordinary visitor.
 
   // Seed built-in defaults ONLY if completely empty (first run).
   // Guests aren't allowed to write per Firestore rules, so swallow any
@@ -2477,6 +2481,17 @@ onAuthStateChanged(auth, async user=>{
   isMainAdmin = !!adminData && adminData.role==='main';
   isResearcher = !!adminData && adminData.role==='researcher';
   adminName = adminData?.name || user?.displayName || user?.email || '';
+  // ELAN sign-data (signData collection) is consent-restricted research
+  // data — only fetch it for roles Firestore rules actually allow to read
+  // it. Everyone else (including logged-out visitors) keeps an empty
+  // SIGN_DATA, which is exactly what all the SIGN_DATA-consuming UI
+  // (edit-form auto-fill, the "View Data" modal, the ELAN import tab) is
+  // already gated behind anyway.
+  if(isAdmin || isResearcher){
+    SIGN_DATA = await loadSignData();
+  } else {
+    SIGN_DATA = {};
+  }
   // Only Main Admin ever reads pendingReviews (see firestore.rules), so only
   // Main Admin gets the realtime listener — everyone else stays unsubscribed,
   // and logging out (or losing Main Admin status) tears it down immediately.
@@ -4910,8 +4925,10 @@ async function init(){
 }
 
 /* ══ SIGN DATA (ELAN annotation lookup) ══
-   Loaded from Firestore's signData collection at startup via loadSignData()
-   (see loadAll()). Keyed by WORD (uppercase). Each entry is an array of
+   Loaded from Firestore's signData collection via loadSignData(), called
+   from onAuthStateChanged() — only for admins/researchers, since this is
+   consent-restricted research data (see firestore.rules). Keyed by WORD
+   (uppercase). Each entry is an array of
    tokens (GLOSS occurrences). Each token:
    { gloss: {tag,begin_tc,begin_sec,end_tc,end_sec,value}, rows: [...] }
    New Group uploads (Group 5, 6, ...) just need new documents added to
