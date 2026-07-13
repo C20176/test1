@@ -1086,6 +1086,26 @@ let adminName=''; // display name from admins/{email}.name, falls back to email
 // admin only; it never affects what other admins see.
 let adminReadState={lastSeenFeedbackTs:0, lastSeenContactsTs:0, ignoredFeedbackIds:[], ignoredContactIds:[]};
 
+// A sign is a "draft" (work-in-progress, not ready for the public dictionary)
+// until it has a How-to-Sign video. That's the only bar for the entry to
+// exist in the public dictionary at all — Concept/Example don't gate the
+// whole entry, they each independently gate their own tab inside the entry
+// (see renderDetail's `tabs` build, which only lists a Concept/Example tab
+// once that specific video is filled in). There's no separate "published"
+// flag — as soon as staff paste in the How-to-Sign link and save, this
+// naturally evaluates to false and the entry shows up on its own.
+function isDraftEntry(w){
+  return !(w && w.vid_how);
+}
+// What the PUBLIC should see. Admins/staff/researchers see every sign
+// (including drafts, so they can find and finish them) — everyone else only
+// sees finished entries. Use this instead of WORDS anywhere the public
+// dictionary (search, filters, listings, counts) reads from it; admin-only
+// screens (the admin table, edit forms) should keep using WORDS directly.
+function visibleWords(){
+  return isAdmin ? WORDS : WORDS.filter(w=>!isDraftEntry(w));
+}
+
 // Escapes any string before it goes into an innerHTML template literal. Every value that
 // ultimately comes from Firestore (sign names, category/tag values, feedback text, nicknames,
 // custom field names, etc.) is technically user-supplied — without this, anyone able to write
@@ -2694,7 +2714,7 @@ document.addEventListener('click', e=>{
 /* ══ HANDSHAPE STRIP ══ */
 function buildHsGrid(){
   const grid=document.getElementById('hsGrid'); grid.innerHTML='';
-  const handSet=new Set(WORDS.flatMap(w=>Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[])));
+  const handSet=new Set(visibleWords().flatMap(w=>Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[])));
   HANDSHAPES.forEach(h=>{
     const l=h.value;
     const has=handSet.has(l);
@@ -2753,7 +2773,7 @@ function buildFilterPanel(){
     if(def.researcherOnly && !isAdmin && !isResearcher) return;
     wrap.appendChild(makeSelect('f_'+def.key, def.name, def.arr.map(x=>x.value)));
   });
-  const hands=[...new Set(WORDS.flatMap(w=>Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[])))].sort();
+  const hands=[...new Set(visibleWords().flatMap(w=>Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[])))].sort();
   wrap.appendChild(makeSelect('fHand','Handshape',hands));
   const vd=document.createElement('div'); vd.className='adv-field';
   vd.innerHTML=`<label>Videos</label><select id="fVid" onchange="doFilter()"><option value="">All</option><option value="how">Has How-to</option><option value="concept">Has Concept</option><option value="example">Has Example</option></select>`;
@@ -2793,12 +2813,12 @@ function countForCard(item){
   if(item.kind==='custom'){
     // A custom-category card represents the whole category, not one
     // option — count signs that have ANY value set for this field.
-    return WORDS.filter(w=>{
+    return visibleWords().filter(w=>{
       const v=w[item.field];
       return Array.isArray(v) ? v.length>0 : !!v;
     }).length;
   }
-  return WORDS.filter(w=>{
+  return visibleWords().filter(w=>{
     const v=w[item.field];
     const arr=Array.isArray(v)?v:(v?[v]:[]);
     return arr.includes(item.value);
@@ -2817,7 +2837,7 @@ window.renderTopicsLanding=function(){
   const allCard=`<div class="topic-card all-signs" onclick="${topicsManageMode?'':"goToTopic(null)"}">
       <div class="topic-card-icon"><i class="ti ti-list"></i></div>
       <div class="topic-card-name">All signs</div>
-      <div class="topic-card-count">${WORDS.length} sign${WORDS.length===1?'':'s'}</div>
+      <div class="topic-card-count">${visibleWords().length} sign${visibleWords().length===1?'':'s'}</div>
     </div>`;
 
   const items=landingCardItems();
@@ -2940,7 +2960,7 @@ function optionItemsFor(fieldId){
 }
 function countForOption(fieldId,value){
   const field='cf_'+fieldId;
-  return WORDS.filter(w=>{
+  return visibleWords().filter(w=>{
     const v=w[field];
     const arr=Array.isArray(v)?v:(v?[v]:[]);
     return arr.includes(value);
@@ -3377,7 +3397,7 @@ let acFocusIndex=-1;
 function buildAcItems(q){
   if(!q || q.length<1) return [];
   const ql=q.toLowerCase();
-  return WORDS.filter(w=>w.en.toLowerCase().includes(ql)||(w.es||'').toLowerCase().includes(ql))
+  return visibleWords().filter(w=>w.en.toLowerCase().includes(ql)||(w.es||'').toLowerCase().includes(ql))
     .slice(0,10)
     .map(w=>({id:w.id,label:w.en,sub:w.es||''}));
 }
@@ -3433,7 +3453,8 @@ window.doFilter=function(){
   const fVid=document.getElementById('fVid')?.value||'';
   const defs=allCategoryDefs();
 
-  const list=WORDS.filter(w=>{
+  const words=visibleWords();
+  const list=words.filter(w=>{
     if(q && !w.en.toLowerCase().includes(q) && !(w.es||'').toLowerCase().includes(q)) return false;
     const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
     if(activeAZ && !hands.includes(activeAZ)) return false;
@@ -3450,7 +3471,7 @@ window.doFilter=function(){
     return true;
   });
 
-  document.getElementById('resultCount').textContent=list.length===WORDS.length?`${list.length} signs`:`${list.length} of ${WORDS.length} signs`;
+  document.getElementById('resultCount').textContent=list.length===words.length?`${list.length} signs`:`${list.length} of ${words.length} signs`;
   const el=document.getElementById('wordList');
   if(!list.length){ el.innerHTML=`<div class="no-results">${esc((SEARCH_I18N[currentLang]||SEARCH_I18N.en).noResults)}</div>`; return; }
   el.innerHTML=list.map(w=>{
@@ -3478,6 +3499,7 @@ window.toggleAdv=function(){ document.getElementById('advPanel').classList.toggl
 /* ══ DETAIL VIEW ══ */
 window.selectWord=async function(id){
   const w=WORDS.find(x=>x.id===id); if(!w) return;
+  if(isDraftEntry(w) && !isAdmin) return; // not ready for the public yet
   activeWord=w.id; activeVideoType='how';
   doFilter();
   renderDetail(w); // render immediately with whatever's cached (fast UI)
@@ -3541,7 +3563,12 @@ function renderDetail(w){
       ${viewDataBtn}
     </div>` : '';
 
-  const tabs=['how','concept','example'].map(type=>{
+  // Concept/Example each only get a tab once that specific video is filled
+  // in — for everyone except admins/staff, who keep seeing all three tabs
+  // (with a "No video yet" placeholder) so they can track what's left to do.
+  const visibleTypes=['how','concept','example'].filter(type=>isAdmin || w['vid_'+type]);
+  if(!visibleTypes.includes(activeVideoType)) activeVideoType='how';
+  const tabs=visibleTypes.map(type=>{
     const m=VID_META[type]; const isActive=type===activeVideoType;
     return `<div class="vid-tab${isActive?' active':''}" data-type="${type}" onclick="switchVideoTab('${w.id}','${type}')"><i class="ti ${m.icon}"></i><span>${m.label}</span></div>`;
   }).join('');
@@ -3797,8 +3824,9 @@ function renderAdminTable(){
     const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
     const dots=['how','concept','example'].map(t=>`<span class="vdot ${w['vid_'+t]?'on':'off'}" title="${VID_META[t].label}"></span>`).join('');
     const reviewBadge=w._pendingReviewId?`<span class="fb-badge" style="background:var(--vexample-light);color:var(--vexample);margin-left:4px;" title="Edited by staff, awaiting Main Admin review">Pending review</span>`:'';
+    const draftBadge=isDraftEntry(w)?`<span class="fb-badge" style="background:var(--vhow-light);color:var(--vhow);margin-left:4px;" title="No How-to-Sign video yet — hidden from the public dictionary until one is added">Draft</span>`:'';
     return `<tr>
-      <td style="font-weight:500">${esc(w.en)}${reviewBadge}</td>
+      <td style="font-weight:500">${esc(w.en)}${reviewBadge}${draftBadge}</td>
       <td style="color:var(--text2);font-style:italic">${esc(w.es||'—')}</td>
       <td>${cats.map(c=>{const x=colorFor(c);return `<span class="pill" style="background:${x[0]};color:${x[1]};margin-right:2px;">${esc(c)}</span>`;}).join('')}</td>
       <td>${hands.map(h=>`<span class="pill" style="background:var(--accent-light);color:var(--accent);margin-right:2px;">${esc(h)}</span>`).join('')}</td>
