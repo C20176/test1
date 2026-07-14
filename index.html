@@ -346,6 +346,15 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .inline-add-btn{flex-shrink:0;padding:0 10px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg2);color:var(--accent);cursor:pointer;font-size:18px;line-height:1;height:36px;}
 .inline-add-btn:hover{background:var(--accent-light);}
 .yt-hint{font-size:11px;color:var(--text3);margin-top:4px;}
+.vid-opt-list{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+.vid-opt-row{display:flex;align-items:center;gap:6px;}
+.vid-opt-row .vid-opt-input{flex:1;}
+.vid-opt-remove{flex-shrink:0;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-sm);color:var(--text3);cursor:pointer;border:0.5px solid var(--border2);background:var(--bg2);}
+.vid-opt-remove:hover{color:#c0392b;border-color:#c0392b;}
+.vid-opt-add{height:auto;padding:5px 12px;font-size:12px;margin-top:8px;display:inline-flex;align-items:center;gap:4px;width:auto;}
+.vid-options{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+.vid-opt-btn{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);}
+.vid-opt-btn.active{background:var(--accent-light);border-color:var(--accent);color:var(--accent);}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:white;font-size:13px;padding:10px 20px;border-radius:var(--r-lg);z-index:999;opacity:0;transition:opacity 0.2s;pointer-events:none;}
 .toast.show{opacity:1;}
 .topics-wrap{max-width:1080px;margin:0 auto;padding:40px 24px 60px;}
@@ -977,10 +986,21 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     <div class="form-field"><label>How to sign (description)</label><textarea id="fDesc" placeholder="Describe the hand movement step by step..."></textarea></div>
     <div style="background:var(--bg2);border-radius:var(--r-md);padding:12px 14px;margin-bottom:14px;">
       <p style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;"><i class="ti ti-brand-youtube" style="color:#FF0000;margin-right:5px;"></i>YouTube Video IDs (Unlisted)</p>
-      <div class="form-grid">
-        <div class="form-field" style="margin-bottom:8px;"><label style="color:var(--vhow);">● How to Sign</label><input type="text" id="fVidHow" placeholder="e.g. dQw4w9WgXcQ"/><p class="yt-hint">youtube.com/watch?v=<strong>THIS_PART</strong></p></div>
-        <div class="form-field" style="margin-bottom:8px;"><label style="color:var(--vconcept);">● Concept</label><input type="text" id="fVidConcept" placeholder="e.g. dQw4w9WgXcQ"/></div>
-        <div class="form-field" style="margin-bottom:0;grid-column:1/-1;"><label style="color:var(--vexample);">● Example</label><input type="text" id="fVidExample" placeholder="e.g. dQw4w9WgXcQ"/></div>
+      <p class="yt-hint" style="margin-bottom:10px;">youtube.com/watch?v=<strong>THIS_PART</strong> — add more than one option if a word has more than one accepted way to sign it.</p>
+      <div class="form-field" style="margin-bottom:12px;">
+        <label style="color:var(--vhow);">● How to Sign</label>
+        <div class="vid-opt-list" id="fVidHowList"></div>
+        <button type="button" class="inline-add-btn vid-opt-add" onclick="addVidOption('fVidHowList')"><i class="ti ti-plus"></i> Add option</button>
+      </div>
+      <div class="form-field" style="margin-bottom:12px;">
+        <label style="color:var(--vconcept);">● Concept</label>
+        <div class="vid-opt-list" id="fVidConceptList"></div>
+        <button type="button" class="inline-add-btn vid-opt-add" onclick="addVidOption('fVidConceptList')"><i class="ti ti-plus"></i> Add option</button>
+      </div>
+      <div class="form-field" style="margin-bottom:0;">
+        <label style="color:var(--vexample);">● Example</label>
+        <div class="vid-opt-list" id="fVidExampleList"></div>
+        <button type="button" class="inline-add-btn vid-opt-add" onclick="addVidOption('fVidExampleList')"><i class="ti ti-plus"></i> Add option</button>
       </div>
     </div>
     <div class="form-field">
@@ -1071,6 +1091,9 @@ let SIGN_DATA     = {};   // signData/{WORD} → {tokens:[...]}  (ELAN annotatio
 let dataLoadedPromise = null; // resolves once loadAll() has populated the arrays above
 
 let activeAZ=null, activeSpecial=[], activeWord=null, activeVideoType='how';
+// Which option (0-based) is showing within the active video tab, per type —
+// e.g. {how:1} means the 2nd "How to Sign" video is currently playing.
+let activeVideoIndices={how:0, concept:0, example:0};
 let editingId=null, deletingId=null, editFormSpecial=[], editFormValues={};
 let currentLang='en', currentUser=null;
 let fbRating=0, fbType='';
@@ -1095,7 +1118,7 @@ let adminReadState={lastSeenFeedbackTs:0, lastSeenContactsTs:0, ignoredFeedbackI
 // flag — as soon as staff paste in the How-to-Sign link and save, this
 // naturally evaluates to false and the entry shows up on its own.
 function isDraftEntry(w){
-  return !(w && w.vid_how);
+  return !(w && vidArr(w,'how').length);
 }
 // What the PUBLIC should see. Admins/staff/researchers see every sign
 // (including drafts, so they can find and finish them) — everyone else only
@@ -1162,6 +1185,14 @@ const VID_META={
   concept:{icon:'ti-bulb',label:'Concept',color:'var(--vconcept)',light:'var(--vconcept-light)'},
   example:{icon:'ti-message',label:'Example',color:'var(--vexample)',light:'var(--vexample-light)'},
 };
+// vid_how/vid_concept/vid_example now hold an ARRAY of YouTube IDs (a word
+// can have more than one accepted way to sign it). Older docs may still have
+// a single string saved before this change — normalize both shapes to an
+// array here so every other piece of code only ever deals with arrays.
+function vidArr(w,type){
+  const v=w && w['vid_'+type];
+  return Array.isArray(v) ? v.filter(x=>x && String(x).trim()) : (v ? [v] : []);
+}
 
 /* ══════════════════════════════════════
    FIRESTORE — load helpers (each collection independent)
@@ -3459,7 +3490,7 @@ window.doFilter=function(){
     const hands=Array.isArray(w.hand)?w.hand:(w.hand?[w.hand]:[]);
     if(activeAZ && !hands.includes(activeAZ)) return false;
     if(fHand && !hands.includes(fHand)) return false;
-    if(fVid && !w['vid_'+fVid]) return false;
+    if(fVid && !vidArr(w,fVid).length) return false;
     if(activeSpecial.length && !activeSpecial.every(s=>(w.special||[]).includes(s))) return false;
     for(const def of defs){
       const fVal=document.getElementById('f_'+def.key)?.value||'';
@@ -3500,7 +3531,7 @@ window.toggleAdv=function(){ document.getElementById('advPanel').classList.toggl
 window.selectWord=async function(id){
   const w=WORDS.find(x=>x.id===id); if(!w) return;
   if(isDraftEntry(w) && !isAdmin) return; // not ready for the public yet
-  activeWord=w.id; activeVideoType='how';
+  activeWord=w.id; activeVideoType='how'; activeVideoIndices={how:0, concept:0, example:0};
   doFilter();
   renderDetail(w); // render immediately with whatever's cached (fast UI)
   showMobileDetail(); // on mobile, slide from list to detail view
@@ -3566,14 +3597,25 @@ function renderDetail(w){
   // Concept/Example each only get a tab once that specific video is filled
   // in — for everyone except admins/staff, who keep seeing all three tabs
   // (with a "No video yet" placeholder) so they can track what's left to do.
-  const visibleTypes=['how','concept','example'].filter(type=>isAdmin || w['vid_'+type]);
+  const visibleTypes=['how','concept','example'].filter(type=>isAdmin || vidArr(w,type).length);
   if(!visibleTypes.includes(activeVideoType)) activeVideoType='how';
   const tabs=visibleTypes.map(type=>{
     const m=VID_META[type]; const isActive=type===activeVideoType;
     return `<div class="vid-tab${isActive?' active':''}" data-type="${type}" onclick="switchVideoTab('${w.id}','${type}')"><i class="ti ${m.icon}"></i><span>${m.label}</span></div>`;
   }).join('');
 
-  const ytId=safeYtId(w['vid_'+activeVideoType]);
+  // Some words have more than one accepted way to sign the same concept.
+  // When the active tab has more than one video, show a row of small
+  // "Option N" buttons underneath the main tabs to switch between them.
+  const curVidList=vidArr(w,activeVideoType);
+  let curVidIdx=activeVideoIndices[activeVideoType]||0;
+  if(curVidIdx>=curVidList.length) curVidIdx=0;
+  activeVideoIndices[activeVideoType]=curVidIdx;
+  const vidOptionsHtml=curVidList.length>1
+    ? `<div class="vid-options">${curVidList.map((_,i)=>`<div class="vid-opt-btn${i===curVidIdx?' active':''}" onclick="switchVideoOption('${w.id}',${i})">Option ${i+1}</div>`).join('')}</div>`
+    : '';
+
+  const ytId=safeYtId(curVidList[curVidIdx]);
   const videoHtml=ytId
     ?`<iframe src="https://www.youtube.com/embed/${ytId}?rel=0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe>
       <button style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.55);border:none;border-radius:var(--r-sm);padding:5px 10px;color:white;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="openFsModal('${ytId}')"><i class="ti ti-maximize"></i> Fullscreen</button>`
@@ -3585,6 +3627,7 @@ function renderDetail(w){
       ${w.es?`<p class="entry-es">${esc(w.es)}</p>`:''}
       <div class="entry-tags">${pillsHtml}${handPills}${specialPills}</div>
       <div class="vid-tabs">${tabs}</div>
+      ${vidOptionsHtml}
       <div class="video-box">${videoHtml}</div>
       <p class="entry-desc"><strong>How to sign:</strong> ${esc(w.desc||'')}</p>
       ${researcherHtml}
@@ -3686,7 +3729,8 @@ function renderFeedbackSection(w){
   `;
 }
 
-window.switchVideoTab=function(wId,type){ const w=WORDS.find(x=>x.id===wId); if(!w) return; activeVideoType=type; renderDetail(w); };
+window.switchVideoTab=function(wId,type){ const w=WORDS.find(x=>x.id===wId); if(!w) return; activeVideoType=type; activeVideoIndices[type]=0; renderDetail(w); };
+window.switchVideoOption=function(wId,idx){ const w=WORDS.find(x=>x.id===wId); if(!w) return; activeVideoIndices[activeVideoType]=idx; renderDetail(w); };
 window.openFsModal=function(ytId){ ytId=safeYtId(ytId); document.getElementById('fsIframe').src=`https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0`; document.getElementById('fsModal').classList.add('show'); };
 window.closeFsModal=function(){ document.getElementById('fsIframe').src=''; document.getElementById('fsModal').classList.remove('show'); };
 
@@ -3996,10 +4040,37 @@ window.applySignDataToken=function(word, tokenIndex){
   renderHandChips();
 };
 
+// Repeatable "video option" rows in the admin form (a word can have more
+// than one accepted way to sign it, so How/Concept/Example each hold a list
+// of YouTube IDs instead of just one).
+window.addVidOption=function(listId, value=''){
+  const list=document.getElementById(listId);
+  const row=document.createElement('div');
+  row.className='vid-opt-row';
+  row.innerHTML=`<input type="text" class="vid-opt-input" placeholder="e.g. dQw4w9WgXcQ" value="${esc(value)}"/><span class="vid-opt-remove" onclick="removeVidOption(this)" title="Remove option"><i class="ti ti-x"></i></span>`;
+  list.appendChild(row);
+};
+window.removeVidOption=function(el){
+  const row=el.closest('.vid-opt-row');
+  const list=el.closest('.vid-opt-list');
+  // Always leave at least one (possibly empty) row so there's somewhere to type.
+  if(list.querySelectorAll('.vid-opt-row').length>1) row.remove();
+  else row.querySelector('.vid-opt-input').value='';
+};
+function setVidOptions(listId, values){
+  const list=document.getElementById(listId); list.innerHTML='';
+  const arr=(values&&values.length)?values:[''];
+  arr.forEach(v=>addVidOption(listId, v));
+}
+function getVidOptions(listId){
+  return [...document.querySelectorAll(`#${listId} .vid-opt-input`)].map(i=>i.value.trim()).filter(Boolean);
+}
+
 window.openAddModal=function(){
   editingId=null; editFormSpecial=[]; editFormValues={}; lastAutoLetterHand=null; signDataAutoHandValues=[]; selectedSignDataTokenIndex=null;
   document.getElementById('modalTitle').textContent='Add new sign';
-  ['fEn','fEs','fDesc','fVidHow','fVidConcept','fVidExample'].forEach(id=>document.getElementById(id).value='');
+  ['fEn','fEs','fDesc'].forEach(id=>document.getElementById(id).value='');
+  setVidOptions('fVidHowList', []); setVidOptions('fVidConceptList', []); setVidOptions('fVidExampleList', []);
   buildModalFields({});
   document.getElementById('editModal').classList.add('show');
   checkSignDataMatch();
@@ -4017,9 +4088,9 @@ window.openEditModal=function(id){
   document.getElementById('fEn').value=w.en||'';
   document.getElementById('fEs').value=w.es||'';
   document.getElementById('fDesc').value=w.desc||'';
-  document.getElementById('fVidHow').value=w.vid_how||'';
-  document.getElementById('fVidConcept').value=w.vid_concept||'';
-  document.getElementById('fVidExample').value=w.vid_example||'';
+  setVidOptions('fVidHowList', vidArr(w,'how'));
+  setVidOptions('fVidConceptList', vidArr(w,'concept'));
+  setVidOptions('fVidExampleList', vidArr(w,'example'));
   buildModalFields(w);
   document.getElementById('editModal').classList.add('show');
   checkSignDataMatch();
@@ -4095,9 +4166,9 @@ window.saveSign=async function(){
   const data={
     en, es:document.getElementById('fEs').value.trim(),
     desc:document.getElementById('fDesc').value.trim(),
-    vid_how:document.getElementById('fVidHow').value.trim(),
-    vid_concept:document.getElementById('fVidConcept').value.trim(),
-    vid_example:document.getElementById('fVidExample').value.trim(),
+    vid_how:getVidOptions('fVidHowList'),
+    vid_concept:getVidOptions('fVidConceptList'),
+    vid_example:getVidOptions('fVidExampleList'),
     special:[...editFormSpecial],
     hand,
     signDataTokenIndex: selectedSignDataTokenIndex,
