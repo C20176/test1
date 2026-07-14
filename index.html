@@ -348,6 +348,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .yt-hint{font-size:11px;color:var(--text3);margin-top:4px;}
 .vid-opt-list{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
 .vid-opt-row{display:flex;align-items:center;gap:6px;}
+.vid-opt-row .vid-opt-label{flex:0 0 34%;}
 .vid-opt-row .vid-opt-input{flex:1;}
 .vid-opt-remove{flex-shrink:0;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-sm);color:var(--text3);cursor:pointer;border:0.5px solid var(--border2);background:var(--bg2);}
 .vid-opt-remove:hover{color:#c0392b;border-color:#c0392b;}
@@ -986,7 +987,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
     <div class="form-field"><label>How to sign (description)</label><textarea id="fDesc" placeholder="Describe the hand movement step by step..."></textarea></div>
     <div style="background:var(--bg2);border-radius:var(--r-md);padding:12px 14px;margin-bottom:14px;">
       <p style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;"><i class="ti ti-brand-youtube" style="color:#FF0000;margin-right:5px;"></i>YouTube Video IDs (Unlisted)</p>
-      <p class="yt-hint" style="margin-bottom:10px;">youtube.com/watch?v=<strong>THIS_PART</strong> — add more than one option if a word has more than one accepted way to sign it.</p>
+      <p class="yt-hint" style="margin-bottom:10px;">youtube.com/watch?v=<strong>THIS_PART</strong> — add more than one option if a word has more than one accepted way to sign it, and give each one a name (e.g. "Two-handed") so it's easy to tell apart.</p>
       <div class="form-field" style="margin-bottom:12px;">
         <label style="color:var(--vhow);">● How to Sign</label>
         <div class="vid-opt-list" id="fVidHowList"></div>
@@ -1185,13 +1186,18 @@ const VID_META={
   concept:{icon:'ti-bulb',label:'Concept',color:'var(--vconcept)',light:'var(--vconcept-light)'},
   example:{icon:'ti-message',label:'Example',color:'var(--vexample)',light:'var(--vexample-light)'},
 };
-// vid_how/vid_concept/vid_example now hold an ARRAY of YouTube IDs (a word
-// can have more than one accepted way to sign it). Older docs may still have
-// a single string saved before this change — normalize both shapes to an
-// array here so every other piece of code only ever deals with arrays.
+// vid_how/vid_concept/vid_example now hold an ARRAY of {id,label} objects
+// (a word can have more than one accepted way to sign it, and each option
+// can be given a free-text name like "Two-handed" or "Regional variant").
+// Older docs may still have a plain string, or an array of plain strings,
+// saved before this change — normalize every shape to {id,label} here so
+// every other piece of code only ever deals with that one shape.
 function vidArr(w,type){
   const v=w && w['vid_'+type];
-  return Array.isArray(v) ? v.filter(x=>x && String(x).trim()) : (v ? [v] : []);
+  const arr=Array.isArray(v) ? v : (v ? [v] : []);
+  return arr
+    .map(x => typeof x==='string' ? {id:x, label:''} : {id:(x&&x.id)||'', label:(x&&x.label)||''})
+    .filter(x => x.id && String(x.id).trim());
 }
 
 /* ══════════════════════════════════════
@@ -3612,10 +3618,10 @@ function renderDetail(w){
   if(curVidIdx>=curVidList.length) curVidIdx=0;
   activeVideoIndices[activeVideoType]=curVidIdx;
   const vidOptionsHtml=curVidList.length>1
-    ? `<div class="vid-options">${curVidList.map((_,i)=>`<div class="vid-opt-btn${i===curVidIdx?' active':''}" onclick="switchVideoOption('${w.id}',${i})">Option ${i+1}</div>`).join('')}</div>`
+    ? `<div class="vid-options">${curVidList.map((o,i)=>`<div class="vid-opt-btn${i===curVidIdx?' active':''}" onclick="switchVideoOption('${w.id}',${i})" title="${o.label?esc(o.label):''}">${esc(o.label||('Option '+(i+1)))}</div>`).join('')}</div>`
     : '';
 
-  const ytId=safeYtId(curVidList[curVidIdx]);
+  const ytId=safeYtId(curVidList[curVidIdx] && curVidList[curVidIdx].id);
   const videoHtml=ytId
     ?`<iframe src="https://www.youtube.com/embed/${ytId}?rel=0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe>
       <button style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.55);border:none;border-radius:var(--r-sm);padding:5px 10px;color:white;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="openFsModal('${ytId}')"><i class="ti ti-maximize"></i> Fullscreen</button>`
@@ -4042,12 +4048,15 @@ window.applySignDataToken=function(word, tokenIndex){
 
 // Repeatable "video option" rows in the admin form (a word can have more
 // than one accepted way to sign it, so How/Concept/Example each hold a list
-// of YouTube IDs instead of just one).
-window.addVidOption=function(listId, value=''){
+// of {id,label} pairs — a YouTube ID plus an optional free-text name like
+// "Two-handed" or "Regional variant" — instead of just one ID).
+window.addVidOption=function(listId, value={id:'',label:''}){
   const list=document.getElementById(listId);
+  const id = typeof value==='string' ? value : (value.id||'');
+  const label = typeof value==='string' ? '' : (value.label||'');
   const row=document.createElement('div');
   row.className='vid-opt-row';
-  row.innerHTML=`<input type="text" class="vid-opt-input" placeholder="e.g. dQw4w9WgXcQ" value="${esc(value)}"/><span class="vid-opt-remove" onclick="removeVidOption(this)" title="Remove option"><i class="ti ti-x"></i></span>`;
+  row.innerHTML=`<input type="text" class="vid-opt-label" placeholder="Name (optional)" value="${esc(label)}"/><input type="text" class="vid-opt-input" placeholder="e.g. dQw4w9WgXcQ" value="${esc(id)}"/><span class="vid-opt-remove" onclick="removeVidOption(this)" title="Remove option"><i class="ti ti-x"></i></span>`;
   list.appendChild(row);
 };
 window.removeVidOption=function(el){
@@ -4055,15 +4064,17 @@ window.removeVidOption=function(el){
   const list=el.closest('.vid-opt-list');
   // Always leave at least one (possibly empty) row so there's somewhere to type.
   if(list.querySelectorAll('.vid-opt-row').length>1) row.remove();
-  else row.querySelector('.vid-opt-input').value='';
+  else row.querySelectorAll('input').forEach(i=>i.value='');
 };
 function setVidOptions(listId, values){
   const list=document.getElementById(listId); list.innerHTML='';
-  const arr=(values&&values.length)?values:[''];
+  const arr=(values&&values.length)?values:[{id:'',label:''}];
   arr.forEach(v=>addVidOption(listId, v));
 }
 function getVidOptions(listId){
-  return [...document.querySelectorAll(`#${listId} .vid-opt-input`)].map(i=>i.value.trim()).filter(Boolean);
+  return [...document.querySelectorAll(`#${listId} .vid-opt-row`)]
+    .map(row=>({id:row.querySelector('.vid-opt-input').value.trim(), label:row.querySelector('.vid-opt-label').value.trim()}))
+    .filter(o=>o.id);
 }
 
 window.openAddModal=function(){
